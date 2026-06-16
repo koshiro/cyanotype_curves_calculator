@@ -1,0 +1,47 @@
+# Entornos locales
+.venv/
+venv/
+env/
+.env
+.env.*
+
+# Python
+__pycache__/
+*.py[cod]
+*$py.class
+.pytest_cache/
+.coverage
+.coverage.*
+htmlcov/
+.mypy_cache/
+.ruff_cache/
+.tox/
+.nox/
+
+# Build y packaging
+dist/
+build/
+*.egg-info/
+pip-wheel-metadata/
+
+# macOS / editores
+.DS_Store
+Thumbs.db
+.idea/
+.vscode/
+
+# Artefactos locales generados por calibraciones.
+# Se ignoran solo en la raiz para no bloquear fixtures futuros en tests/docs.
+/*.png
+/*.tif
+/*.tiff
+/*.jpg
+/*.jpeg
+/*.layout.json
+/curvas*/
+/outputs/
+/*.acv
+/*.settings
+/*ranking.json
+/*comparacion*.json
+/*reporte*.json
