@@ -26,3 +26,12 @@ export { calibrate, type Calibration, type CalibrationCandidate } from './curve/
 export { selectAnchors, type Anchor, type AnchorResult } from './export/anchors';
 export * from './export/formats';
 export * from './target/layout';
+export * from './target/markers';
+export { renderTarget, BACKGROUND_VALUE } from './target/render';
+export * from './image/types';
+export * from './image/color';
+export * from './image/homography';
+export * from './scan/detect';
+export * from './scan/measure';
+export * from './scan/flatfield';
+export * from './scan/analyze';

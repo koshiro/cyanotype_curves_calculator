@@ -87,6 +87,19 @@ export class LayoutError extends Error {
 	}
 }
 
+/** Puntos repartidos (fraccion de la grilla) para las repeticiones de referencia. */
+const SPREAD_POINTS: readonly (readonly [number, number])[] = [
+	[0, 0],
+	[1, 1],
+	[1, 0],
+	[0, 1],
+	[0.5, 0.5],
+	[0.5, 0],
+	[0.5, 1],
+	[0, 0.5],
+	[1, 0.5]
+];
+
 export function stepValues(steps: number): number[] {
 	if (!Number.isInteger(steps) || steps < 2 || steps > 256) {
 		throw new LayoutError('INVALID_OPTIONS', { steps });
@@ -166,21 +179,72 @@ export function buildTargetLayout(options: TargetOptions = {}): TargetLayout {
 		throw new LayoutError('DOES_NOT_FIT', { required: entries.length, capacity });
 	}
 
-	// Centra la grilla usada (rellenando por filas completas).
-	const usedRows = Math.ceil(entries.length / columns);
-	const usedWidth = columns * patch + (columns - 1) * gap;
-	const usedHeight = usedRows * patch + (usedRows - 1) * gap;
-	const left = gridLeft + Math.round((gridWidth - usedWidth) / 2);
-	const top = gridTop + Math.round((gridHeight - usedHeight) / 2);
-
-	const order = randomize ? shuffle(entries, mulberry32(seed)) : entries;
-	const patches: LayoutPatch[] = order.map((entry, id) => {
-		const row = Math.floor(id / columns);
-		const column = id % columns;
+	const cellBox = (row: number, column: number, left: number, top: number): Box => {
 		const x0 = left + column * (patch + gap);
 		const y0 = top + row * (patch + gap);
-		return { id, value: entry.value, role: entry.role, box: [x0, y0, x0 + patch, y0 + patch] };
-	});
+		return [x0, y0, x0 + patch, y0 + patch];
+	};
+
+	let patches: LayoutPatch[];
+	if (!randomize) {
+		// Orden de lectura en una grilla compacta y centrada (util para inspeccion visual).
+		const usedRows = Math.ceil(entries.length / columns);
+		const usedWidth = columns * patch + (columns - 1) * gap;
+		const usedHeight = usedRows * patch + (usedRows - 1) * gap;
+		const left = gridLeft + Math.round((gridWidth - usedWidth) / 2);
+		const top = gridTop + Math.round((gridHeight - usedHeight) / 2);
+		patches = entries.map((entry, id) => ({
+			id,
+			value: entry.value,
+			role: entry.role,
+			box: cellBox(Math.floor(id / columns), id % columns, left, top)
+		}));
+	} else {
+		// Toda la grilla disponible: las repeticiones de referencia van a puntos repartidos
+		// (esquinas, centro, bordes) para medir el campo plano en toda la hoja, y el resto de
+		// los parches ocupa celdas al azar, para no confundir posicion con tono.
+		const usedWidth = columns * patch + (columns - 1) * gap;
+		const usedHeight = rows * patch + (rows - 1) * gap;
+		const left = gridLeft + Math.round((gridWidth - usedWidth) / 2);
+		const top = gridTop + Math.round((gridHeight - usedHeight) / 2);
+		const taken = new Map<number, (typeof entries)[number]>();
+		const nearestFree = (row: number, column: number): number => {
+			let best = -1;
+			let bestDistance = Infinity;
+			for (let cell = 0; cell < capacity; cell++) {
+				if (taken.has(cell)) continue;
+				const d = (Math.floor(cell / columns) - row) ** 2 + ((cell % columns) - column) ** 2;
+				if (d < bestDistance) {
+					bestDistance = d;
+					best = cell;
+				}
+			}
+			return best;
+		};
+		const references = entries.filter((e) => e.role === 'reference');
+		const values = [...new Set(references.map((e) => e.value))];
+		for (const [j, value] of values.entries()) {
+			const copies = references.filter((e) => e.value === value);
+			copies.forEach((entry, k) => {
+				const [fx, fy] = SPREAD_POINTS[(k + j) % SPREAD_POINTS.length]!;
+				taken.set(nearestFree(Math.round(fy * (rows - 1)), Math.round(fx * (columns - 1))), entry);
+			});
+		}
+		const random = mulberry32(seed);
+		const free = shuffle(
+			Array.from({ length: capacity }, (_, cell) => cell).filter((cell) => !taken.has(cell)),
+			random
+		);
+		entries.filter((e) => e.role === 'step').forEach((entry, i) => taken.set(free[i]!, entry));
+		patches = [...taken.entries()]
+			.sort(([a], [b]) => a - b)
+			.map(([cell, entry]) => ({
+				id: cell,
+				value: entry.value,
+				role: entry.role,
+				box: cellBox(Math.floor(cell / columns), cell % columns, left, top)
+			}));
+	}
 
 	return {
 		schema: LAYOUT_SCHEMA,

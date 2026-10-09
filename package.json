@@ -37,5 +37,9 @@
 		"typescript-eslint": "^8.71.1",
 		"vite": "^8.3.4",
 		"vitest": "^4.1.11"
+	},
+	"dependencies": {
+		"fast-png": "^8.0.0",
+		"utif2": "^4.1.0"
 	}
 }
