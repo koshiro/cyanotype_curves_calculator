@@ -39,6 +39,7 @@
 		"vitest": "^4.1.11"
 	},
 	"dependencies": {
+		"@lucide/svelte": "1.48.0",
 		"fast-png": "^8.0.0",
 		"utif2": "^4.1.0"
 	}
