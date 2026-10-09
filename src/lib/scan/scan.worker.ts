@@ -4,10 +4,17 @@
  * JPEG y otros formatos de 8 bits se decodifican con createImageBitmap + OffscreenCanvas.
  */
 import { fromRgba } from '../io/decode';
+import { ImageFormatError } from '../io/errors';
 import { runScanJob, type ScanJob } from './pipeline';
 
 async function decodeWithBrowser(bytes: ArrayBuffer) {
-	const bitmap = await createImageBitmap(new Blob([bytes]));
+	let bitmap: ImageBitmap;
+	try {
+		bitmap = await createImageBitmap(new Blob([bytes]));
+	} catch {
+		// El navegador no pudo decodificarlo: formato no soportado o archivo danado.
+		throw new ImageFormatError('UNSUPPORTED_FORMAT', {});
+	}
 	const canvas = new OffscreenCanvas(bitmap.width, bitmap.height);
 	const context = canvas.getContext('2d');
 	if (!context) throw new Error('OffscreenCanvas 2D no disponible');

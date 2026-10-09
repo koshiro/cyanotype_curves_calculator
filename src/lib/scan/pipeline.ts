@@ -68,6 +68,8 @@ export type ScanOutcome = ScanSuccess | ScanFailure;
 export type BrowserDecoder = (bytes: ArrayBuffer) => Promise<RasterImage>;
 
 const PREVIEW_MAX_SIDE = 1400;
+/** Fraccion del lado del parche que mide `measurePatches` por defecto. */
+const MEASURED_FRACTION = 0.6;
 
 export async function runScanJob(job: ScanJob, decodeOther?: BrowserDecoder): Promise<ScanOutcome> {
 	try {
@@ -84,8 +86,11 @@ export async function runScanJob(job: ScanJob, decodeOther?: BrowserDecoder): Pr
 			const [x, y] = applyHomography(analysis.location.homography, p);
 			return [x * preview.scale, y * preview.scale];
 		};
+		// Se dibuja el area central que realmente se mide (60 % del lado), no el borde del parche.
 		const overlays: PatchOverlay[] = analysis.measurements.map((m, i) => {
-			const [x0, y0, x1, y1] = m.patch.box;
+			const [bx0, by0, bx1, by1] = m.patch.box;
+			const inset = ((bx1 - bx0) * (1 - MEASURED_FRACTION)) / 2;
+			const [x0, y0, x1, y1] = [bx0 + inset, by0 + inset, bx1 - inset, by1 - inset];
 			return {
 				value: m.patch.value,
 				corners: (
@@ -124,11 +129,9 @@ export async function runScanJob(job: ScanJob, decodeOther?: BrowserDecoder): Pr
 		if (error instanceof ScanError || error instanceof ImageFormatError) {
 			return { ok: false, code: error.code, params: error.params };
 		}
-		return {
-			ok: false,
-			code: 'UNKNOWN',
-			params: { message: error instanceof Error ? error.message : String(error) }
-		};
+		// El detalle tecnico va a la consola, nunca a la interfaz.
+		console.error('Fallo inesperado al analizar el escaneo', error);
+		return { ok: false, code: 'UNKNOWN', params: {} };
 	}
 }
 

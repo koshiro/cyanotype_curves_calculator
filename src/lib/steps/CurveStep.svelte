@@ -3,7 +3,8 @@
 	import { untrack } from 'svelte';
 	import type { FitMethod, MeasuredPatch } from '$lib/core/curve/types';
 	import type { CurveComputation, CurveFailure } from '$lib/curve/compute';
-	import { includedPatches, runCurve } from '$lib/curve/run';
+	import { includedPatches, invalidPrints, runCurve } from '$lib/curve/run';
+	import { DEFAULT_THRESHOLDS } from '$lib/core/curve/diagnostics';
 	import { i18n, type MessageKey } from '$lib/i18n/index.svelte';
 	import type { Project } from '$lib/project/types';
 	import Button from '$lib/ui/Button.svelte';
@@ -30,6 +31,12 @@
 		project.rounds.map((round, i) => ({ print: i + 1, round })).filter((entry) => entry.round.scan)
 	);
 	const excluded = $derived(new Set(project.curve?.excludedPrints ?? []));
+	const invalid = $derived(invalidPrints(project.rounds));
+	/** "Recomendado" solo si el mejor metodo tiene un error aceptable. */
+	const reliable = $derived(
+		(result?.candidates.find((c) => c.method === result?.recommended)?.looRmse ?? Infinity) <=
+			DEFAULT_THRESHOLDS.poorFit
+	);
 	const patches = $derived<MeasuredPatch[]>(includedPatches(project.rounds, project.curve?.excludedPrints));
 
 	// Recalcula en el worker cuando cambian las mediciones incluidas.
@@ -114,10 +121,14 @@
 		<Notice tone="info" title={i18n.t('curve.none.title')}><p>{i18n.t('curve.none.body')}</p></Notice>
 		<Button variant="primary" href={scanHref}>{i18n.t('curve.none.action')}</Button>
 	{:else}
-		{#if scanned.length > 1}
+		{#if invalid.length > 0}
+			<Notice tone="warning">{i18n.t('curve.invalid', { prints: invalid.join(', ') })}</Notice>
+		{/if}
+
+		{#if scanned.filter((entry) => !invalid.includes(entry.print)).length > 1}
 			<fieldset class="prints">
 				<legend>{i18n.t('curve.prints')}</legend>
-				{#each scanned as entry (entry.print)}
+				{#each scanned.filter((entry) => !invalid.includes(entry.print)) as entry (entry.print)}
 					<label>
 						<input
 							type="checkbox"
@@ -153,6 +164,8 @@
 						<LineChart
 							label={i18n.t('curve.chart.correction')}
 							xLabel={i18n.t('curve.axis.input')}
+							xShort={i18n.t('curve.axis.input.short')}
+							square
 							yLabel={i18n.t('curve.axis.output')}
 							yDomain={[0, 255]}
 							yTicks={[0, 64, 128, 191, 255]}
@@ -177,6 +190,7 @@
 						<LineChart
 							label={i18n.t('curve.chart.response')}
 							xLabel={i18n.t('curve.axis.negative')}
+							xShort={i18n.t('curve.axis.negative.short')}
 							yLabel={i18n.t('curve.axis.lightness')}
 							yDomain={lightnessDomain}
 							formatY={(v) => fmt(v)}
@@ -206,16 +220,6 @@
 								}))
 							}}
 						/>
-						{#if selected.curve}
-							<p class="caption">
-								{i18n.t('curve.band')}:
-								{i18n.t('curve.metric.usable.value', {
-									percent: Math.round((selected.report.usableFraction ?? 0) * 100),
-									from: Math.round(selected.curve.usable.whiteEdge),
-									to: Math.round(selected.curve.usable.blackEdge)
-								})}
-							</p>
-						{/if}
 					{/if}
 
 					<details class="table">
@@ -263,6 +267,11 @@
 				</div>
 
 				<div class="side">
+					{#if !reliable}
+						<Notice tone="warning"
+							>{i18n.t('curve.method.unreliable', { limit: DEFAULT_THRESHOLDS.poorFit })}</Notice
+						>
+					{/if}
 					<fieldset class="methods">
 						<legend>{i18n.t('curve.methods')}</legend>
 						{#each result.candidates as candidate (candidate.method)}
@@ -278,7 +287,7 @@
 								<span class="method-body">
 									<span class="method-name">
 										{i18n.t(`curve.method.${candidate.method}` as MessageKey)}
-										{#if candidate.method === result.recommended}
+										{#if candidate.method === result.recommended && reliable}
 											<span class="badge"
 												><Check size={14} aria-hidden="true" /> {i18n.t('curve.method.recommended')}</span
 											>
@@ -325,7 +334,7 @@
 								</div>
 								<div>
 									<dt>{i18n.t('curve.metric.noise')}</dt>
-									<dd>σ {fmt(result.data.noise, 2)} L*</dd>
+									<dd>σ {result.data.noise < 0.01 ? '< ' + fmt(0.01, 2) : fmt(result.data.noise, 2)} L*</dd>
 								</div>
 							</dl>
 						</section>
@@ -418,7 +427,6 @@
 		justify-items: start;
 	}
 
-	.caption,
 	.computing {
 		margin: 0;
 		color: var(--text-secondary);

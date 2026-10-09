@@ -20,12 +20,25 @@ export function runCurve(patches: MeasuredPatch[]): CurveRun {
 	return { promise, cancel: () => worker.terminate() };
 }
 
-/** Parches de las impresiones escaneadas que el usuario incluyo en la curva. */
+type ScannedRound = { scan?: { patches: MeasuredPatch[]; diagnostics: { severity: string }[] } };
+
+/** Impresiones (1..n) cuyo escaneo tiene un diagnostico de error: no se usan para la curva. */
+export function invalidPrints(rounds: readonly ScannedRound[]): number[] {
+	return rounds.flatMap((round, i) =>
+		round.scan?.diagnostics.some((d) => d.severity === 'error') ? [i + 1] : []
+	);
+}
+
+/**
+ * Parches de las impresiones escaneadas que entran a la curva: las que el usuario no excluyo y
+ * cuyo escaneo no tiene errores (un escaneo equivocado nunca debe producir una curva).
+ */
 export function includedPatches(
-	rounds: readonly { scan?: { patches: MeasuredPatch[] } }[],
+	rounds: readonly ScannedRound[],
 	excludedPrints: readonly number[] = []
 ): MeasuredPatch[] {
+	const invalid = invalidPrints(rounds);
 	return rounds.flatMap((round, i) =>
-		round.scan && !excludedPrints.includes(i + 1) ? round.scan.patches : []
+		round.scan && !excludedPrints.includes(i + 1) && !invalid.includes(i + 1) ? round.scan.patches : []
 	);
 }

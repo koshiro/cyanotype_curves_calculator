@@ -26,9 +26,16 @@
 		new Set<StepId>([
 			...(project && project.name.trim() ? (['project'] as StepId[]) : []),
 			...(project && project.rounds.length > 0 ? (['target'] as StepId[]) : []),
-			...(project && project.rounds.some((r) => r.scan) ? (['scan'] as StepId[]) : []),
+			// Escaneo completo solo si hay alguno sin errores (uno equivocado no cuenta).
+			...(project &&
+			project.rounds.some((r) => r.scan && !r.scan.diagnostics.some((d) => d.severity === 'error'))
+				? (['scan'] as StepId[])
+				: []),
 			// Con mediciones la curva queda calculada (con el metodo recomendado si no se eligio otro).
-			...(project && project.rounds.some((r) => r.scan) ? (['curve'] as StepId[]) : [])
+			...(project &&
+			project.rounds.some((r) => r.scan && !r.scan.diagnostics.some((d) => d.severity === 'error'))
+				? (['curve'] as StepId[])
+				: [])
 		])
 	);
 

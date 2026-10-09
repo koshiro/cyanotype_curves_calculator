@@ -81,10 +81,8 @@ export function computeCurve(patches: readonly MeasuredPatch[]): CurveComputatio
 		};
 	} catch (error) {
 		if (error instanceof CalibrationError) return { ok: false, code: error.code, params: error.params };
-		return {
-			ok: false,
-			code: 'UNKNOWN',
-			params: { message: error instanceof Error ? error.message : String(error) }
-		};
+		// El detalle tecnico va a la consola, nunca a la interfaz.
+		console.error('Fallo inesperado al calcular la curva', error);
+		return { ok: false, code: 'UNKNOWN', params: {} };
 	}
 }

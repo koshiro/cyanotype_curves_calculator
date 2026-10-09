@@ -2,7 +2,7 @@
 	import { Check, Download, FileOutput, TriangleAlert } from '@lucide/svelte';
 	import type { FitMethod } from '$lib/core/curve/types';
 	import { encodeAcvWithReport, encodeAmp, encodeCube, encodeGimpCurves } from '$lib/core/export/formats';
-	import type { CurveComputation } from '$lib/curve/compute';
+	import type { CurveComputation, CurveFailure } from '$lib/curve/compute';
 	import { includedPatches, runCurve } from '$lib/curve/run';
 	import { i18n, type MessageKey } from '$lib/i18n/index.svelte';
 	import { exportProject } from '$lib/project/transfer';
@@ -18,6 +18,7 @@
 
 	let { project, curveHref }: Props = $props();
 	let result = $state<CurveComputation | null>(null);
+	let failure = $state<CurveFailure | null>(null);
 	let computing = $state(false);
 
 	const patches = $derived(includedPatches(project.rounds, project.curve?.excludedPrints));
@@ -33,6 +34,7 @@
 		void run.promise.then((outcome) => {
 			computing = false;
 			result = outcome.ok ? outcome : null;
+			failure = outcome.ok ? null : outcome;
 		});
 		return () => run.cancel();
 	});
@@ -46,6 +48,14 @@
 	const samples = $derived(result?.candidates.find((c) => c.method === method)?.curve?.samples ?? null);
 	const acv = $derived(samples ? encodeAcvWithReport(samples) : null);
 	const base = $derived(`cyano-curva-${slug(project.name)}-${method ?? 'curva'}`);
+	/** Hay avisos de severidad advertencia o error en las mediciones o en el modelo elegido. */
+	const hasProblems = $derived.by(() => {
+		if (!result) return false;
+		const chosen = result.candidates.find((c) => c.method === method);
+		return [...result.data.diagnostics, ...(chosen?.report.diagnostics ?? [])].some(
+			(d) => d.severity === 'warning' || d.severity === 'error'
+		);
+	});
 	const methodName = $derived(method ? i18n.t(`curve.method.${method}` as MessageKey) : '');
 
 	interface ExportFile {
@@ -106,6 +116,11 @@
 		];
 	});
 
+	const failureKey = (code: string) =>
+		(['TOO_FEW_VALUES', 'NOT_DECREASING', 'INVALID_MEASUREMENT', 'LOW_RANGE'].includes(code)
+			? `curve.error.${code}`
+			: 'curve.error.UNKNOWN') as MessageKey;
+
 	function download(file: ExportFile) {
 		const { bytes, type } = file.make();
 		downloadBytes(bytes, file.file, type);
@@ -121,6 +136,30 @@
 </script>
 
 {#snippet downloadIcon()}<Download size={18} aria-hidden="true" />{/snippet}
+{#snippet fileRow(file: ExportFile, lead: boolean)}
+	<div class="file" class:lead-file={lead}>
+		<div class="file-text">
+			<p class="file-title">
+				{file.title}
+				{#if lead}
+					<span class="badge"><Check size={14} aria-hidden="true" /> {i18n.t('export.recommended')}</span>
+				{/if}
+			</p>
+			<p class="file-body">{file.body}</p>
+			{#if file.warning}
+				<p class="file-warning"><TriangleAlert size={16} aria-hidden="true" /> {file.warning}</p>
+			{/if}
+		</div>
+		<Button
+			variant={lead ? 'primary' : 'secondary'}
+			icon={downloadIcon}
+			aria-label={i18n.t('export.download.file', { file: file.file })}
+			onclick={() => download(file)}
+		>
+			{i18n.t('export.download')}
+		</Button>
+	</div>
+{/snippet}
 {#snippet projectIcon()}<FileOutput size={18} aria-hidden="true" />{/snippet}
 
 <section class="step" aria-labelledby="export-title">
@@ -132,39 +171,29 @@
 	{#if patches.length === 0}
 		<Notice tone="info" title={i18n.t('export.none.title')}><p>{i18n.t('export.none.body')}</p></Notice>
 		<Button variant="primary" href={curveHref}>{i18n.t('export.none.action')}</Button>
+	{:else if failure}
+		<Notice tone="error" title={i18n.t('export.failed')}>
+			<p>{i18n.t(failureKey(failure.code), failure.params)}</p>
+		</Notice>
+		<Button variant="primary" href={curveHref}>{i18n.t('export.none.action')}</Button>
 	{:else if computing && !result}
 		<p class="hint" role="status">{i18n.t('curve.computing')}</p>
 	{:else if files.length > 0}
 		<p class="method">{i18n.t('export.method', { method: methodName })}</p>
+		{#if hasProblems}
+			<Notice tone="warning">
+				<p>{i18n.t('export.problems')}</p>
+			</Notice>
+		{/if}
 
-		<section aria-labelledby="files-title">
+		<section aria-labelledby="files-title" class="files-section">
 			<h2 id="files-title" class="visually-hidden">{i18n.t('export.files')}</h2>
+			{#each files.filter((f) => f.recommended) as file (file.id)}
+				{@render fileRow(file, true)}
+			{/each}
 			<ul class="files">
-				{#each files as file (file.id)}
-					<li class="file" class:lead-file={file.recommended}>
-						<div class="file-text">
-							<p class="file-title">
-								{file.title}
-								{#if file.recommended}
-									<span class="badge"
-										><Check size={14} aria-hidden="true" /> {i18n.t('export.recommended')}</span
-									>
-								{/if}
-							</p>
-							<p class="file-body">{file.body}</p>
-							{#if file.warning}
-								<p class="file-warning"><TriangleAlert size={16} aria-hidden="true" /> {file.warning}</p>
-							{/if}
-						</div>
-						<Button
-							variant={file.recommended ? 'primary' : 'secondary'}
-							icon={downloadIcon}
-							aria-label={i18n.t('export.download.file', { file: file.file })}
-							onclick={() => download(file)}
-						>
-							{i18n.t('export.download')}
-						</Button>
-					</li>
+				{#each files.filter((f) => !f.recommended) as file (file.id)}
+					<li>{@render fileRow(file, false)}</li>
 				{/each}
 			</ul>
 		</section>
@@ -220,13 +249,24 @@
 		border-block-end: var(--border-width) solid var(--border-subtle);
 	}
 
-	/* El formato recomendado lidera: superficie propia en vez de un borde lateral. */
+	.files-section {
+		display: grid;
+		gap: var(--space-4);
+	}
+
+	/*
+	 * El formato exacto lidera como bloque propio sobre la lista (superficie y radio mayor, no
+	 * un borde lateral). El resto de la lista usa el mismo eje izquierdo que el texto del bloque.
+	 */
 	.lead-file {
 		padding: var(--space-4);
 		border: var(--border-width) solid var(--border-subtle);
-		border-radius: var(--radius-md);
+		border-radius: var(--radius-lg);
 		background: var(--surface-raised);
-		margin-block-end: var(--space-2);
+	}
+
+	.files .file {
+		padding-inline: var(--space-4);
 	}
 
 	.file-text {

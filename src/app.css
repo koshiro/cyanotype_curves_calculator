@@ -185,6 +185,7 @@ body {
 	*::after {
 		/* Valor tecnico para anular animaciones, no un token de diseno. ds-allow-hardcode */
 		animation-duration: 0.01ms !important; /* ds-allow-hardcode */
+		animation-iteration-count: 1 !important;
 		transition-duration: 0.01ms !important; /* ds-allow-hardcode */
 		scroll-behavior: auto !important;
 	}

@@ -1,5 +1,5 @@
 <script lang="ts">
-	import { ScanLine, Upload } from '@lucide/svelte';
+	import { Maximize2, ScanLine, Upload } from '@lucide/svelte';
 	import { i18n, type MessageKey } from '$lib/i18n/index.svelte';
 	import type { Project, Round, ScanRecord } from '$lib/project/types';
 	import type { ScanOutcome, ScanSuccess } from '$lib/scan/pipeline';
@@ -32,6 +32,12 @@
 	const round = $derived<Round | undefined>(project.rounds[selected - 1]);
 	const scan = $derived(round?.scan);
 	const outliers = $derived(scan ? scan.overlays.filter((o) => o.outlier).length : 0);
+	/** Un diagnostico de severidad error invalida el escaneo: no se da por bueno ni entra a la curva. */
+	const scanHasError = $derived(Boolean(scan?.diagnostics.some((d) => d.severity === 'error')));
+	let zoom: HTMLDialogElement | undefined = $state();
+
+	/** Tiempo maximo de analisis antes de darlo por fallido (escaneos enormes). */
+	const ANALYSIS_TIMEOUT_MS = 180_000;
 
 	function analyze(file: File, flatField: 'auto' | 'off') {
 		const target = round;
@@ -42,7 +48,17 @@
 		busy = file.name;
 		void file.arrayBuffer().then((bytes) => {
 			const worker = new ScanWorker();
+			const crash = () => {
+				clearTimeout(timer);
+				worker.terminate();
+				failure = { code: 'WORKER_CRASHED', params: {} };
+				busy = null;
+			};
+			const timer = setTimeout(crash, ANALYSIS_TIMEOUT_MS);
+			worker.onerror = crash;
+			worker.onmessageerror = crash;
 			worker.onmessage = async (event: MessageEvent<ScanOutcome | WorkerSuccess>) => {
+				clearTimeout(timer);
 				worker.terminate();
 				const outcome = event.data;
 				if (!outcome.ok) {
@@ -102,15 +118,14 @@
 			return i18n.t('scan.error.MARKERS_NOT_FOUND', { count: missing || 4 });
 		}
 		const known = [
+			'WORKER_CRASHED',
 			'GEOMETRY_INCONSISTENT',
 			'CORRUPT_FILE',
 			'UNSUPPORTED_FORMAT',
 			'UNSUPPORTED_BIT_DEPTH',
 			'UNSUPPORTED_LAYOUT'
 		];
-		return known.includes(code)
-			? i18n.t(key, params)
-			: i18n.t('scan.error.UNKNOWN', { message: String(params.message ?? code) });
+		return known.includes(code) ? i18n.t(key, params) : i18n.t('scan.error.UNKNOWN');
 	}
 
 	const points = (corners: readonly (readonly [number, number])[]) =>
@@ -118,6 +133,20 @@
 </script>
 
 {#snippet uploadIcon()}<Upload size={18} aria-hidden="true" />{/snippet}
+{#snippet zoomIcon()}<Maximize2 size={18} aria-hidden="true" />{/snippet}
+{#snippet overlay(preview: { width: number; height: number; dataUrl: string }, record: ScanRecord)}
+	<img src={preview.dataUrl} alt="" width={preview.width} height={preview.height} />
+	<svg viewBox="0 0 {preview.width} {preview.height}" aria-hidden="true">
+		{#each record.overlays as item, i (i)}
+			<polygon class="halo" points={points(item.corners)} />
+			<polygon class="patch" class:outlier={item.outlier} points={points(item.corners)} />
+		{/each}
+		{#each record.markers as marker, i (i)}
+			<polygon class="halo" points={points(marker)} />
+			<polygon class="marker" points={points(marker)} />
+		{/each}
+	</svg>
+{/snippet}
 
 <section class="step" aria-labelledby="scan-title">
 	<header>
@@ -157,26 +186,23 @@
 			onchange={(event) => onFiles(event.currentTarget.files)}
 		/>
 
-		{#if busy}
+		{#if busy && !scan}
 			<div class="analyzing" role="status" aria-live="polite">
 				<ScanLine class="pulse" size={32} aria-hidden="true" />
 				<p>{i18n.t('scan.analyzing', { file: busy })}</p>
 			</div>
 		{:else if scan}
-			<div class="result">
+			{#if busy}
+				<p class="reanalyzing" role="status" aria-live="polite">
+					<ScanLine class="pulse" size={18} aria-hidden="true" />
+					{i18n.t('scan.analyzing', { file: busy })}
+				</p>
+			{/if}
+			<!-- Mientras se reanaliza, el resultado anterior se conserva atenuado: sin saltos. -->
+			<div class="result" class:stale={Boolean(busy)} inert={Boolean(busy)}>
 				<figure class="preview" aria-label={i18n.t('scan.result')}>
 					<div class="stage" style:--ratio={scan.preview.width / scan.preview.height}>
-						<img src={scan.preview.dataUrl} alt="" width={scan.preview.width} height={scan.preview.height} />
-						<svg viewBox="0 0 {scan.preview.width} {scan.preview.height}" aria-hidden="true">
-							{#each scan.overlays as overlay, i (i)}
-								<polygon class="halo" points={points(overlay.corners)} />
-								<polygon class="patch" class:outlier={overlay.outlier} points={points(overlay.corners)} />
-							{/each}
-							{#each scan.markers as marker, i (i)}
-								<polygon class="halo" points={points(marker)} />
-								<polygon class="marker" points={points(marker)} />
-							{/each}
-						</svg>
+						{@render overlay(scan.preview, scan)}
 					</div>
 					<figcaption>
 						{i18n.t('scan.summary', {
@@ -197,7 +223,11 @@
 						{#if outliers > 0}<br />{i18n.t('scan.outliers', { count: outliers })}{/if}
 					</p>
 
-					{#if justSaved}
+					<Button variant="ghost" icon={zoomIcon} onclick={() => zoom?.showModal()}
+						>{i18n.t('scan.zoom')}</Button
+					>
+
+					{#if justSaved && !scanHasError}
 						<Notice tone="success">{i18n.t('scan.saved', { print: selected })}</Notice>
 					{/if}
 
@@ -228,11 +258,21 @@
 						</label>
 					{/if}
 
+					{#if scanHasError}
+						<p class="hint">{i18n.t('scan.excluded')}</p>
+					{/if}
 					<div class="actions">
-						<Button variant="primary" href={curveHref}>{i18n.t('scan.next')}</Button>
-						<Button variant="secondary" icon={uploadIcon} onclick={() => input?.click()}
-							>{i18n.t('scan.replace')}</Button
-						>
+						{#if scanHasError}
+							<Button variant="primary" icon={uploadIcon} onclick={() => input?.click()}
+								>{i18n.t('scan.replace')}</Button
+							>
+							<Button variant="secondary" href={curveHref}>{i18n.t('scan.next')}</Button>
+						{:else}
+							<Button variant="primary" href={curveHref}>{i18n.t('scan.next')}</Button>
+							<Button variant="secondary" icon={uploadIcon} onclick={() => input?.click()}
+								>{i18n.t('scan.replace')}</Button
+							>
+						{/if}
 					</div>
 				</div>
 			</div>
@@ -278,6 +318,20 @@
 		{/if}
 	{/if}
 </section>
+
+{#if scan}
+	<dialog bind:this={zoom} class="zoom" aria-labelledby="zoom-title">
+		<header class="zoom-header">
+			<h2 id="zoom-title">{i18n.t('scan.zoom.title')}</h2>
+			<Button variant="secondary" onclick={() => zoom?.close()}>{i18n.t('scan.zoom.close')}</Button>
+		</header>
+		<div class="zoom-body">
+			<div class="zoom-stage" style:width="{scan.preview.width}px" style:height="{scan.preview.height}px">
+				{@render overlay(scan.preview, scan)}
+			</div>
+		</div>
+	</dialog>
+{/if}
 
 <style>
 	.step {
@@ -381,6 +435,75 @@
 		display: grid;
 		gap: var(--space-6);
 		align-items: start;
+		transition: opacity var(--duration-base) var(--ease-standard);
+	}
+
+	.result.stale {
+		opacity: 0.55;
+	}
+
+	.reanalyzing {
+		display: flex;
+		align-items: center;
+		gap: var(--space-2);
+		margin: 0;
+		color: var(--text-secondary);
+		font-size: var(--text-sm);
+	}
+
+	.reanalyzing :global(.pulse) {
+		animation: pulse var(--duration-slow) var(--ease-standard) infinite alternate;
+	}
+
+	.zoom {
+		width: min(96vw, 100rem);
+		max-height: 92vh;
+		padding: 0;
+		border: var(--border-width) solid var(--border-subtle);
+		border-radius: var(--radius-lg);
+		background: var(--surface-raised);
+		color: var(--text-primary);
+	}
+
+	.zoom::backdrop {
+		background: var(--scrim);
+	}
+
+	.zoom-header {
+		position: sticky;
+		inset-block-start: 0;
+		display: flex;
+		align-items: center;
+		justify-content: space-between;
+		gap: var(--space-4);
+		padding: var(--space-3) var(--space-4);
+		border-block-end: var(--border-width) solid var(--border-subtle);
+		background: var(--surface-raised);
+	}
+
+	.zoom-header h2 {
+		margin: 0;
+		font-size: var(--text-lg);
+	}
+
+	/* Tamano natural de la miniatura (1 px = 1 px): se recorre con desplazamiento. */
+	.zoom-body {
+		overflow: auto;
+		padding: var(--space-4);
+		background: var(--surface-canvas);
+	}
+
+	.zoom-stage {
+		position: relative;
+		max-width: none;
+	}
+
+	.zoom-stage :global(img),
+	.zoom-stage :global(svg) {
+		position: absolute;
+		inset: 0;
+		width: 100%;
+		height: 100%;
 	}
 
 	.preview {
@@ -400,8 +523,8 @@
 		aspect-ratio: var(--ratio);
 	}
 
-	.stage img,
-	.stage svg {
+	.stage :global(img),
+	.stage :global(svg) {
 		position: absolute;
 		inset: 0;
 		width: 100%;
@@ -409,27 +532,28 @@
 	}
 
 	/* Trazos dobles (halo oscuro + linea clara) visibles sobre papel blanco y sobre azul. */
-	polygon {
+	:global(.stage polygon),
+	:global(.zoom-stage polygon) {
 		fill: none;
 		vector-effect: non-scaling-stroke;
 	}
 
-	.halo {
+	:global(.halo) {
 		stroke: var(--overlay-halo);
 		stroke-width: 3;
 	}
 
-	.patch {
+	:global(.patch) {
 		stroke: var(--overlay-line);
 		stroke-width: 1.25;
 	}
 
-	.patch.outlier {
+	:global(.patch.outlier) {
 		stroke: var(--overlay-warning);
 		stroke-dasharray: 4 3;
 	}
 
-	.marker {
+	:global(.marker) {
 		stroke: var(--overlay-marker);
 		stroke-width: 2;
 	}

@@ -24,6 +24,10 @@
 		if (!file) return;
 		try {
 			const project = importProject(await file.text(), new Set(projects.list.map((p) => p.id)));
+			// Un nombre repetido se distingue para no dejar dos filas identicas.
+			if (projects.list.some((p) => p.name.trim() === project.name.trim())) {
+				project.name = i18n.t('projects.import.suffix', { name: title(project) });
+			}
 			await projects.save(project);
 			importMessage = { tone: 'success', key: 'projects.import.done', params: { name: title(project) } };
 		} catch (error) {

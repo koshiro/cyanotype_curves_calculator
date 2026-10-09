@@ -20,6 +20,10 @@
 		formatY?: (value: number) => string;
 		xTicks?: readonly number[];
 		yTicks?: readonly number[];
+		/** Etiqueta corta del eje X para la lectura de lectores de pantalla. */
+		xShort?: string;
+		/** Area de trazado cuadrada (curvas 0..255 → 0..255, como en Photoshop y GIMP). */
+		square?: boolean;
 	}
 
 	let {
@@ -32,13 +36,20 @@
 		band = null,
 		formatY = (v) => v.toFixed(1),
 		xTicks = [0, 64, 128, 191, 255],
-		yTicks
+		yTicks,
+		xShort,
+		square = false
 	}: Props = $props();
 
 	let width = $state(640);
-	const height = $derived(Math.round(Math.min(Math.max(width * 0.62, 240), 440)));
 	const margin = { top: 16, right: 20, bottom: 44, left: 52 };
-	const plotW = $derived(Math.max(width - margin.left - margin.right, 10));
+	/** Ancho disponible para el area de trazado; en modo cuadrado se limita para no crecer de mas. */
+	const plotW = $derived(Math.max(Math.min(width - margin.left - margin.right, square ? 480 : Infinity), 10));
+	const height = $derived(
+		square
+			? Math.round(plotW + margin.top + margin.bottom)
+			: Math.round(Math.min(Math.max(width * 0.62, 240), 440))
+	);
 	const plotH = $derived(height - margin.top - margin.bottom);
 	const sx = (x: number) => margin.left + (x / 255) * plotW;
 	const sy = (y: number) => margin.top + (1 - (y - yDomain[0]) / (yDomain[1] - yDomain[0])) * plotH;
@@ -58,37 +69,78 @@
 		...(dots ? [{ id: dots.id, label: dots.label, color: dots.color, kind: 'dot' as const }] : [])
 	]);
 
+	/** Con muchos puntos se achican y pierden el anillo, para no tapar la linea del modelo. */
+	const dense = $derived((dots?.points.length ?? 0) > 30);
+
 	let cursor = $state<number | null>(null);
+	/** En pantallas tactiles el cursor queda fijo tras tocar, hasta tocar fuera o pulsar Escape. */
+	let pinned = $state(false);
 	let svg: SVGSVGElement | undefined = $state();
+
+	/** Con puntos medidos, el cursor salta al punto mas cercano: la lectura compara la misma X. */
+	function snap(x: number): number {
+		const clamped = Math.min(Math.max(Math.round(x), 0), 255);
+		if (!dots || dots.points.length === 0) return clamped;
+		return dots.points.reduce(
+			(best, p) => (Math.abs(p.x - clamped) < Math.abs(best - clamped) ? p.x : best),
+			dots.points[0]!.x
+		);
+	}
 
 	function pointerToX(event: PointerEvent): number {
 		const rect = svg!.getBoundingClientRect();
-		const x = ((event.clientX - rect.left - margin.left) / plotW) * 255;
-		return Math.min(Math.max(Math.round(x), 0), 255);
+		return snap(((event.clientX - rect.left - margin.left) / plotW) * 255);
 	}
+
+	function onpointerdown(event: PointerEvent) {
+		if (event.pointerType !== 'touch') return;
+		pinned = true;
+		cursor = pointerToX(event);
+	}
+
+	$effect(() => {
+		if (!pinned) return;
+		const release = (event: PointerEvent) => {
+			if (svg && !svg.contains(event.target as Node)) {
+				pinned = false;
+				cursor = null;
+			}
+		};
+		document.addEventListener('pointerdown', release);
+		return () => document.removeEventListener('pointerdown', release);
+	});
 
 	function onkey(event: KeyboardEvent) {
 		const step = event.shiftKey ? 15 : 1;
 		if (event.key === 'ArrowRight' || event.key === 'ArrowLeft') {
 			event.preventDefault();
 			const base = cursor ?? 128;
-			cursor = Math.min(Math.max(base + (event.key === 'ArrowRight' ? step : -step), 0), 255);
+			const direction = event.key === 'ArrowRight' ? 1 : -1;
+			if (dots && dots.points.length > 0) {
+				// Con puntos medidos, las flechas recorren los puntos (Mayus salta de a 5).
+				const xs = dots.points
+					.map((p) => p.x)
+					.filter((v, i, all) => all.indexOf(v) === i)
+					.sort((a, b) => a - b);
+				const index = xs.indexOf(snap(base));
+				cursor = xs[Math.min(Math.max(index + direction * (event.shiftKey ? 5 : 1), 0), xs.length - 1)]!;
+			} else {
+				cursor = Math.min(Math.max(base + direction * step, 0), 255);
+			}
 		} else if (event.key === 'Home') {
 			cursor = 0;
 		} else if (event.key === 'End') {
 			cursor = 255;
 		} else if (event.key === 'Escape') {
 			cursor = null;
+			pinned = false;
 		}
 	}
 
 	const nearestDot = $derived.by(() => {
 		if (cursor === null || !dots) return null;
 		let best: { x: number; y: number } | null = null;
-		for (const p of dots.points) {
-			if (Math.abs(p.x - cursor) <= 3 && (!best || Math.abs(p.x - cursor) < Math.abs(best.x - cursor)))
-				best = p;
-		}
+		for (const p of dots.points) if (p.x === cursor) best = p;
 		return best;
 	});
 	const tooltipLeft = $derived(cursor === null ? 0 : sx(cursor));
@@ -96,7 +148,9 @@
 	const readout = $derived.by(() => {
 		const x = cursor ?? 128;
 		const parts = series.map((l) => `${l.label} ${formatY(l.values[x] ?? 0)}`);
-		return `${xLabel} ${x}: ${parts.join(', ')}`;
+		const measured = dots?.points.find((p) => p.x === x);
+		if (measured && dots) parts.push(`${dots.label} ${formatY(measured.y)}`);
+		return `${xShort ?? xLabel} ${x}: ${parts.join(', ')}`;
 	});
 </script>
 
@@ -140,17 +194,32 @@
 			aria-valuenow={cursor ?? 128}
 			aria-valuetext={readout}
 			tabindex="0"
-			onpointermove={(event) => (cursor = pointerToX(event))}
-			onpointerleave={() => (cursor = null)}
+			onpointermove={(event) => {
+				if (event.pointerType !== 'touch') cursor = pointerToX(event);
+			}}
+			{onpointerdown}
+			onpointerleave={(event) => {
+				if (event.pointerType !== 'touch' && !pinned) cursor = null;
+			}}
 			onkeydown={onkey}
-			onblur={() => (cursor = null)}
+			onblur={() => {
+				if (!pinned) cursor = null;
+			}}
 		>
 			{#if band}
+				<!-- Se sombrea lo que queda fuera del rango util: es lo que el negativo desperdicia. -->
 				<rect
 					class="band"
-					x={sx(band.from)}
+					x={margin.left}
 					y={margin.top}
-					width={Math.max(sx(band.to) - sx(band.from), 0)}
+					width={Math.max(sx(band.from) - margin.left, 0)}
+					height={plotH}
+				/>
+				<rect
+					class="band"
+					x={sx(band.to)}
+					y={margin.top}
+					width={Math.max(margin.left + plotW - sx(band.to), 0)}
 					height={plotH}
 				/>
 			{/if}
@@ -179,28 +248,34 @@
 				text-anchor="middle">{yLabel}</text
 			>
 
-			{#each lines as line (line.id)}
-				<path class="line" class:reference={line.reference} d={path(line.values)} stroke={line.color} />
-			{/each}
-
+			<!-- Puntos debajo y lineas encima: el modelo siempre se ve sobre las mediciones. -->
 			{#if dots}
 				{#each dots.points as point, i (i)}
 					<circle
 						class="dot"
 						cx={sx(point.x)}
 						cy={sy(point.y)}
-						r="4"
+						r={dense ? 2.5 : 4}
 						fill={point.hollow ? 'var(--chart-surface)' : dots.color}
-						stroke={point.hollow ? dots.color : 'var(--chart-surface)'}
+						stroke={point.hollow ? dots.color : dense ? 'none' : 'var(--chart-surface)'}
 					/>
 				{/each}
 			{/if}
+
+			{#each lines as line (line.id)}
+				<path class="line" class:reference={line.reference} d={path(line.values)} stroke={line.color} />
+			{/each}
 
 			<!-- Etiquetas directas solo sin puntos (con puntos chocarian; la leyenda ya identifica). -->
 			{#if !dots}
 				{#each series as line (line.id)}
 					{@const last = line.values.at(-1) ?? 0}
-					<text class="direct" x={sx(255) - 4} y={sy(last) - 8} text-anchor="end">{line.label}</text>
+					<text
+						class="direct"
+						x={sx(255) - 8}
+						y={Math.min(sy(last) + 18, margin.top + plotH - 6)}
+						text-anchor="end">{line.label}</text
+					>
 				{/each}
 			{/if}
 			{#each lines.filter((l) => l.reference) as line (line.id)}
@@ -223,12 +298,7 @@
 		</svg>
 
 		{#if cursor !== null}
-			<div
-				class="tooltip"
-				style:left="{tooltipLeft}px"
-				class:flip={tooltipLeft > width * 0.6}
-				aria-live="polite"
-			>
+			<div class="tooltip" style:left="{tooltipLeft}px" class:flip={tooltipLeft > width * 0.6}>
 				<p class="tooltip-x">{xLabel}: {cursor}</p>
 				{#each series as line (line.id)}
 					<p class="row">
@@ -297,8 +367,8 @@
 	}
 
 	.band {
-		fill: var(--chart-model);
-		opacity: 0.08;
+		fill: var(--chart-reference);
+		opacity: 0.18;
 	}
 
 	.grid {
