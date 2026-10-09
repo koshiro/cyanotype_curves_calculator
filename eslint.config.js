@@ -26,6 +26,13 @@ export default ts.config(
 		}
 	},
 	{
+		rules: {
+			// Todos los enlaces internos se construyen en src/lib/routes.ts con resolve() de
+			// $app/paths; la regla no puede seguir esas funciones y marcaria cada uso.
+			'svelte/no-navigation-without-resolve': 'off'
+		}
+	},
+	{
 		ignores: ['build/', '.svelte-kit/', 'dist/', 'node_modules/', 'docs/', '.venv/']
 	}
 );
