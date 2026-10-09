@@ -1,0 +1,62 @@
+/*
+ * Tokens de diseno. La interfaz es de grises neutros (croma 0): es una herramienta de
+ * medicion tonal y el entorno no debe sesgar la percepcion de escaneos y previsualizaciones.
+ * El azul de Prusia se reserva para controles y estados, nunca alrededor de imagenes.
+ */
+:root {
+	color-scheme: light dark;
+	--surface: light-dark(oklch(0.985 0 0), oklch(0.2 0 0));
+	--surface-raised: light-dark(oklch(1 0 0), oklch(0.24 0 0));
+	--surface-sunken: light-dark(oklch(0.95 0 0), oklch(0.16 0 0));
+	--border: light-dark(oklch(0.86 0 0), oklch(0.34 0 0));
+	--text: light-dark(oklch(0.22 0 0), oklch(0.93 0 0));
+	--text-muted: light-dark(oklch(0.48 0 0), oklch(0.7 0 0));
+	--accent: light-dark(oklch(0.42 0.13 255), oklch(0.72 0.11 245));
+	--accent-contrast: light-dark(oklch(0.99 0 0), oklch(0.18 0 0));
+	--focus: light-dark(oklch(0.55 0.16 255), oklch(0.78 0.12 245));
+	--radius: 0.5rem;
+	--space: 1rem;
+	--font-sans: system-ui, -apple-system, 'Segoe UI', Roboto, sans-serif;
+	--font-mono: ui-monospace, 'SF Mono', 'Cascadia Mono', monospace;
+}
+
+:root[data-theme='light'] {
+	color-scheme: light;
+}
+:root[data-theme='dark'] {
+	color-scheme: dark;
+}
+
+*,
+*::before,
+*::after {
+	box-sizing: border-box;
+}
+
+html {
+	-webkit-text-size-adjust: 100%;
+	text-size-adjust: 100%;
+}
+
+body {
+	margin: 0;
+	background: var(--surface);
+	color: var(--text);
+	font-family: var(--font-sans);
+	line-height: 1.55;
+}
+
+:focus-visible {
+	outline: 2px solid var(--focus);
+	outline-offset: 2px;
+}
+
+@media (prefers-reduced-motion: reduce) {
+	*,
+	*::before,
+	*::after {
+		animation-duration: 0.01ms !important;
+		transition-duration: 0.01ms !important;
+		scroll-behavior: auto !important;
+	}
+}

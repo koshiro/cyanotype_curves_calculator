@@ -1,28 +1,21 @@
+# Dependencias y builds de la app web
+node_modules/
+.svelte-kit/
+build/
+dist/
+coverage/
+*.tsbuildinfo
+vite.config.*.timestamp-*
+
 # Entornos locales
-.venv/
-venv/
-env/
 .env
 .env.*
+!.env.example
 
-# Python
+# Restos de la version Python (solo referencia en el tag v0.1-python)
+.venv/
 __pycache__/
-*.py[cod]
-*$py.class
 .pytest_cache/
-.coverage
-.coverage.*
-htmlcov/
-.mypy_cache/
-.ruff_cache/
-.tox/
-.nox/
-
-# Build y packaging
-dist/
-build/
-*.egg-info/
-pip-wheel-metadata/
 
 # macOS / editores
 .DS_Store
@@ -30,8 +23,8 @@ Thumbs.db
 .idea/
 .vscode/
 
-# Artefactos locales generados por calibraciones.
-# Se ignoran solo en la raiz para no bloquear fixtures futuros en tests/docs.
+# Artefactos locales de calibraciones (escaneos, targets y curvas reales).
+# Se ignoran solo en la raiz para no bloquear fixtures en src/ o tests.
 /*.png
 /*.tif
 /*.tiff
@@ -41,7 +34,13 @@ Thumbs.db
 /curvas*/
 /outputs/
 /*.acv
+/*.amp
+/*.cube
 /*.settings
 /*ranking.json
 /*comparacion*.json
 /*reporte*.json
+
+# Claude Code (configuracion personal)
+.claude/settings.local.json
+.claude/worktrees/
