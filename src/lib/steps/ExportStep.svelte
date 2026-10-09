@@ -14,9 +14,10 @@
 	interface Props {
 		project: Project;
 		curveHref: string;
+		photoHref: string;
 	}
 
-	let { project, curveHref }: Props = $props();
+	let { project, curveHref, photoHref }: Props = $props();
 	let result = $state<CurveComputation | null>(null);
 	let failure = $state<CurveFailure | null>(null);
 	let computing = $state(false);
@@ -199,6 +200,14 @@
 		</section>
 	{/if}
 
+	{#if files.length > 0}
+		<section class="next" aria-labelledby="photo-next-title">
+			<h2 id="photo-next-title">{i18n.t('photo.title')}</h2>
+			<p>{i18n.t('photo.lead')}</p>
+			<Button variant="secondary" href={photoHref}>{i18n.t('photo.drop.choose')}</Button>
+		</section>
+	{/if}
+
 	<section class="project" aria-labelledby="project-export-title">
 		<h2 id="project-export-title">{i18n.t('export.project.title')}</h2>
 		<p>{i18n.t('export.project.body')}</p>
@@ -311,6 +320,7 @@
 		font-size: var(--text-sm);
 	}
 
+	.next,
 	.project {
 		display: grid;
 		gap: var(--space-2);
@@ -318,11 +328,13 @@
 		padding-block-start: var(--space-6);
 	}
 
+	.next h2,
 	.project h2 {
 		margin: 0;
 		font-size: var(--text-xl);
 	}
 
+	.next p,
 	.project p {
 		max-width: 60ch;
 		margin: 0;

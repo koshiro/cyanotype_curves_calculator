@@ -32,9 +32,15 @@ function chunk(type: string, payload: Uint8Array): Uint8Array {
 	return out;
 }
 
-/** Codifica un plano gris de 8 bits como PNG con la resolucion indicada. */
-export function encodeGrayPng(pixels: Uint8Array, width: number, height: number, dpi: number): Uint8Array {
-	const png = encode({ width, height, data: pixels, channels: 1, depth: 8 });
+/** Codifica un plano gris de 8 o 16 bits (segun el tipo del arreglo) como PNG con su resolucion. */
+export function encodeGrayPng(
+	pixels: Uint8Array | Uint16Array,
+	width: number,
+	height: number,
+	dpi: number
+): Uint8Array {
+	const depth = pixels instanceof Uint16Array ? 16 : 8;
+	const png = encode({ width, height, data: pixels, channels: 1, depth });
 	const pixelsPerMetre = Math.round(dpi / 0.0254);
 	const payload = new Uint8Array(9);
 	const view = new DataView(payload.buffer);
