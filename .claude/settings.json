@@ -1,0 +1,6 @@
+{
+	"enabledPlugins": {
+		"superpowers@anthropic-plugin-directory": true,
+		"ux-ui-agent-skills@ux-ui-agent-skills": true
+	}
+}

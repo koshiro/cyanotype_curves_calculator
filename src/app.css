@@ -1,23 +1,122 @@
 /*
- * Tokens de diseno. La interfaz es de grises neutros (croma 0): es una herramienta de
- * medicion tonal y el entorno no debe sesgar la percepcion de escaneos y previsualizaciones.
- * El azul de Prusia se reserva para controles y estados, nunca alrededor de imagenes.
+ * Tokens de diseno: unica fuente de verdad del tema (importada una vez en +layout.svelte).
+ *
+ * Tres niveles: primitivos (paleta cruda, nunca se usan directo en componentes) →
+ * semanticos (por intencion, con light-dark() para el tema) → los componentes solo
+ * consumen semanticos. `src/lib/design/contrast.test.ts` mide en CI cada pareja de uso
+ * en ambos temas segun WCAG 2.2.
+ *
+ * La interfaz es de grises neutros (croma 0): es una herramienta de medicion tonal y el
+ * entorno no debe sesgar la percepcion de escaneos y previsualizaciones. El azul de Prusia
+ * es el unico acento y se reserva para acciones y foco, nunca alrededor de imagenes.
  */
 :root {
 	color-scheme: light dark;
-	--surface: light-dark(oklch(0.985 0 0), oklch(0.2 0 0));
-	--surface-raised: light-dark(oklch(1 0 0), oklch(0.24 0 0));
-	--surface-sunken: light-dark(oklch(0.95 0 0), oklch(0.16 0 0));
-	--border: light-dark(oklch(0.86 0 0), oklch(0.34 0 0));
-	--text: light-dark(oklch(0.22 0 0), oklch(0.93 0 0));
-	--text-muted: light-dark(oklch(0.48 0 0), oklch(0.7 0 0));
-	--accent: light-dark(oklch(0.42 0.13 255), oklch(0.72 0.11 245));
-	--accent-contrast: light-dark(oklch(0.99 0 0), oklch(0.18 0 0));
-	--focus: light-dark(oklch(0.55 0.16 255), oklch(0.78 0.12 245));
-	--radius: 0.5rem;
-	--space: 1rem;
+
+	/* ---- Primitivos ---------------------------------------------------- */
+	--neutral-0: oklch(1 0 0);
+	--neutral-50: oklch(0.985 0 0);
+	--neutral-100: oklch(0.965 0 0);
+	--neutral-150: oklch(0.95 0 0);
+	--neutral-200: oklch(0.91 0 0);
+	--neutral-300: oklch(0.86 0 0);
+	--neutral-400: oklch(0.7 0 0);
+	--neutral-500: oklch(0.58 0 0);
+	--neutral-600: oklch(0.48 0 0);
+	--neutral-700: oklch(0.38 0 0);
+	--neutral-750: oklch(0.34 0 0);
+	--neutral-800: oklch(0.27 0 0);
+	--neutral-850: oklch(0.24 0 0);
+	--neutral-900: oklch(0.2 0 0);
+	--neutral-950: oklch(0.16 0 0);
+	--neutral-text-dark: oklch(0.93 0 0);
+	--neutral-text-light: oklch(0.22 0 0);
+
+	--prussian-300: oklch(0.78 0.12 245);
+	--prussian-400: oklch(0.72 0.11 245);
+	--prussian-500: oklch(0.55 0.16 255);
+	--prussian-700: oklch(0.42 0.13 255);
+	--prussian-800: oklch(0.36 0.12 255);
+
+	--red-400: oklch(0.75 0.15 25);
+	--red-700: oklch(0.5 0.19 27);
+	--amber-300: oklch(0.83 0.13 80);
+	--amber-700: oklch(0.5 0.11 65);
+	--green-300: oklch(0.8 0.14 150);
+	--green-700: oklch(0.48 0.12 150);
+
+	/* ---- Semanticos: superficies y texto ------------------------------- */
+	--surface-page: light-dark(var(--neutral-50), var(--neutral-900));
+	--surface-raised: light-dark(var(--neutral-0), var(--neutral-850));
+	--surface-sunken: light-dark(var(--neutral-150), var(--neutral-950));
+	--text-primary: light-dark(var(--neutral-text-light), var(--neutral-text-dark));
+	--text-secondary: light-dark(var(--neutral-600), var(--neutral-400));
+
+	/* Bordes: `subtle` es decorativo (separadores); `control` delimita controles (≥ 3:1). */
+	--border-subtle: light-dark(var(--neutral-300), var(--neutral-750));
+	--border-control: light-dark(var(--neutral-500), var(--neutral-500));
+
+	/* ---- Semanticos: acciones y foco ----------------------------------- */
+	--action-primary: light-dark(var(--prussian-700), var(--prussian-400));
+	--action-primary-hover: light-dark(var(--prussian-800), var(--prussian-300));
+	--action-primary-text: light-dark(var(--neutral-50), var(--neutral-950));
+	--action-destructive: light-dark(var(--red-700), var(--red-400));
+	--action-destructive-text: light-dark(var(--neutral-50), var(--neutral-950));
+	--text-link: var(--action-primary);
+	--focus-ring: light-dark(var(--prussian-500), var(--prussian-300));
+
+	/* ---- Semanticos: estado (siempre con icono + texto, nunca solo color) */
+	--feedback-danger: light-dark(var(--red-700), var(--red-400));
+	--feedback-warning: light-dark(var(--amber-700), var(--amber-300));
+	--feedback-success: light-dark(var(--green-700), var(--green-300));
+	--feedback-info: light-dark(var(--prussian-700), var(--prussian-400));
+
+	/* ---- Tipografia: escala Major Third (1.25), base 16px --------------- */
 	--font-sans: system-ui, -apple-system, 'Segoe UI', Roboto, sans-serif;
 	--font-mono: ui-monospace, 'SF Mono', 'Cascadia Mono', monospace;
+	--text-xs: 0.75rem;
+	--text-sm: 0.875rem;
+	--text-base: 1rem;
+	--text-lg: 1.125rem;
+	--text-xl: 1.25rem;
+	--text-2xl: 1.5rem;
+	--text-3xl: 1.875rem;
+	--text-4xl: 2.25rem;
+	--text-5xl: 3rem;
+	--leading-tight: 1.2;
+	--leading-normal: 1.55;
+	--measure: 65ch;
+	--weight-regular: 400;
+	--weight-medium: 500;
+	--weight-semibold: 600;
+
+	/* ---- Espaciado: ritmo de 4px --------------------------------------- */
+	--space-1: 0.25rem;
+	--space-2: 0.5rem;
+	--space-3: 0.75rem;
+	--space-4: 1rem;
+	--space-6: 1.5rem;
+	--space-8: 2rem;
+	--space-12: 3rem;
+	--space-16: 4rem;
+	--space-24: 6rem;
+
+	/* ---- Forma, tamano y foco ------------------------------------------ */
+	--radius-sm: 0.25rem;
+	--radius-md: 0.5rem;
+	--radius-lg: 0.75rem;
+	--border-width: 1px;
+	--focus-width: 2px;
+	--focus-offset: 2px;
+	--control-height: 2.5rem;
+	/* WCAG 2.5.8: objetivo minimo de 24×24 CSS px. */
+	--target-min: 1.5rem;
+
+	/* ---- Movimiento ---------------------------------------------------- */
+	--duration-fast: 120ms;
+	--duration-base: 200ms;
+	--duration-slow: 320ms;
+	--ease-standard: cubic-bezier(0.2, 0, 0, 1);
 }
 
 :root[data-theme='light'] {
@@ -40,23 +139,25 @@ html {
 
 body {
 	margin: 0;
-	background: var(--surface);
-	color: var(--text);
+	background: var(--surface-page);
+	color: var(--text-primary);
 	font-family: var(--font-sans);
-	line-height: 1.55;
+	font-size: var(--text-base);
+	line-height: var(--leading-normal);
 }
 
 :focus-visible {
-	outline: 2px solid var(--focus);
-	outline-offset: 2px;
+	outline: var(--focus-width) solid var(--focus-ring);
+	outline-offset: var(--focus-offset);
 }
 
 @media (prefers-reduced-motion: reduce) {
 	*,
 	*::before,
 	*::after {
-		animation-duration: 0.01ms !important;
-		transition-duration: 0.01ms !important;
+		/* Valor tecnico para anular animaciones, no un token de diseno. ds-allow-hardcode */
+		animation-duration: 0.01ms !important; /* ds-allow-hardcode */
+		transition-duration: 0.01ms !important; /* ds-allow-hardcode */
 		scroll-behavior: auto !important;
 	}
 }
