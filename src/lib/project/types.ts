@@ -2,7 +2,7 @@
  * Proyecto de calibracion: lo que define el proceso y sus rondas (target + escaneo).
  * Se guarda en IndexedDB y se exporta como JSON versionado.
  */
-import type { MeasuredPatch } from '../core/curve/types';
+import type { FitMethod, MeasuredPatch } from '../core/curve/types';
 import type { TargetLayout, TargetOptions } from '../core/target/layout';
 
 export const PROJECT_SCHEMA = 'cyano-curve/project';
@@ -55,6 +55,8 @@ export interface Project {
 	updatedAt: string;
 	process: ProcessInfo;
 	rounds: Round[];
+	/** Eleccion del usuario en el paso Curva (si no hay, se usa el metodo recomendado). */
+	curve?: { method: FitMethod; excludedPrints: number[] };
 }
 
 export const EMPTY_PROCESS: ProcessInfo = {

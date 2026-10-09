@@ -16,9 +16,10 @@
 		project: Project;
 		onsave: () => Promise<void>;
 		targetHref: string;
+		curveHref: string;
 	}
 
-	let { project = $bindable(), onsave, targetHref }: Props = $props();
+	let { project = $bindable(), onsave, targetHref, curveHref }: Props = $props();
 
 	let selected = $state(project.rounds.length);
 	let busy = $state<string | null>(null);
@@ -228,12 +229,11 @@
 					{/if}
 
 					<div class="actions">
-						<Button variant="primary" disabled>{i18n.t('scan.next')}</Button>
+						<Button variant="primary" href={curveHref}>{i18n.t('scan.next')}</Button>
 						<Button variant="secondary" icon={uploadIcon} onclick={() => input?.click()}
 							>{i18n.t('scan.replace')}</Button
 						>
 					</div>
-					<p class="hint">{i18n.t('scan.next.soon')}</p>
 				</div>
 			</div>
 		{:else}

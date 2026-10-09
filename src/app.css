@@ -78,6 +78,16 @@
 	--overlay-line: var(--neutral-50);
 	--overlay-marker: var(--prussian-300);
 	--overlay-warning: var(--amber-300);
+	/*
+	 * Graficos: paleta categorica de 2 series validada con el validador de dataviz
+	 * (banda de luminosidad, croma, separacion CVD y normal, contraste) en ambos temas.
+	 * Modelo (linea) en azul; medido (puntos) en naranja. Grilla y ejes recesivos.
+	 */
+	--chart-model: light-dark(oklch(0.55 0.15 255), oklch(0.66 0.13 248));
+	--chart-measured: light-dark(oklch(0.66 0.15 55), oklch(0.67 0.14 58));
+	--chart-reference: var(--border-control);
+	--chart-grid: var(--border-subtle);
+	--chart-surface: var(--surface-raised);
 	/* Fondo de lienzo para previsualizar imagenes: gris medio neutro, no sesga tonos. */
 	--surface-canvas: light-dark(var(--neutral-200), var(--neutral-800));
 

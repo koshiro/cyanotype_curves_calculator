@@ -69,6 +69,9 @@ const PAIRS: readonly [string, string, number, string][] = [
 	['feedback-success', 'surface-page', 4.5, 'texto de exito'],
 	['feedback-info', 'surface-page', 4.5, 'texto informativo'],
 	['feedback-danger', 'surface-raised', 4.5, 'error en tarjeta'],
+	['chart-model', 'chart-surface', 3, 'linea del modelo en el grafico'],
+	['chart-measured', 'chart-surface', 3, 'puntos medidos en el grafico'],
+	['chart-reference', 'chart-surface', 3, 'diagonal de referencia'],
 	['feedback-warning', 'surface-raised', 4.5, 'advertencia en tarjeta']
 ];
 
