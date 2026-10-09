@@ -110,6 +110,21 @@ export function buildTargetLayout(options: TargetOptions = {}): TargetLayout {
 	const referenceValues = options.referenceValues ?? [0, 128, 255];
 	const replicates = options.referenceReplicates ?? 4;
 
+	const invalid = (name: string, value: unknown) =>
+		new LayoutError('INVALID_OPTIONS', { [name]: String(value) });
+	if (!(Number.isFinite(dpi) && dpi >= 72 && dpi <= 2880)) throw invalid('dpi', dpi);
+	for (const [name, value] of Object.entries({ patchSizeMm, markerSizeMm })) {
+		if (!(Number.isFinite(value) && value > 0)) throw invalid(name, value);
+	}
+	for (const [name, value] of Object.entries({ gapMm, marginMm })) {
+		if (!(Number.isFinite(value) && value >= 0)) throw invalid(name, value);
+	}
+	if (!(Number.isInteger(replicates) && replicates >= 0)) throw invalid('referenceReplicates', replicates);
+	if (!Number.isInteger(seed)) throw invalid('seed', seed);
+	for (const value of referenceValues) {
+		if (!(Number.isFinite(value) && value >= 0 && value <= 255)) throw invalid('referenceValues', value);
+	}
+
 	const px = (mm: number) => Math.round((mm / 25.4) * dpi);
 	const width = px(widthMm);
 	const height = px(heightMm);

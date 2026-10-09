@@ -10,7 +10,8 @@
  *   GIMP usa las muestras tal cual, sin re-interpolar puntos.
  * - .cube: LUT 1D (Adobe/Resolve Cube LUT Specification 1.0), aplicada por igual a R, G y B.
  */
-import { selectAnchors, type Anchor, type AnchorOptions } from './anchors';
+import { naturalCubic } from '../math/interpolate';
+import { selectAnchors, type Anchor, type AnchorOptions, type AnchorResult } from './anchors';
 
 function toBytes(samples: ArrayLike<number>): Uint8Array {
 	if (samples.length !== 256) throw new Error('Se esperan 256 muestras');
@@ -22,10 +23,18 @@ const IDENTITY: readonly Anchor[] = [
 	[255, 255]
 ];
 
-export function encodeAcv(samples: ArrayLike<number>, options: AnchorOptions = {}): Uint8Array {
-	const { anchors } = selectAnchors(samples, options);
+/**
+ * Codifica la curva como .acv y devuelve, junto a los bytes, cuan fiel queda despues de que
+ * Photoshop la re-interpole. La interfaz debe recomendar `.amp` cuando `fidelity.faithful`
+ * es false.
+ */
+export function encodeAcvWithReport(
+	samples: ArrayLike<number>,
+	options: AnchorOptions = {}
+): { bytes: Uint8Array; fidelity: AnchorResult } {
+	const fidelity = selectAnchors(samples, options);
 	// Maestra + 4 curvas nulas (R, G, B y una extra), como guarda Photoshop en RGB.
-	const curves: readonly (readonly Anchor[])[] = [anchors, IDENTITY, IDENTITY, IDENTITY, IDENTITY];
+	const curves: readonly (readonly Anchor[])[] = [fidelity.anchors, IDENTITY, IDENTITY, IDENTITY, IDENTITY];
 	const size = 4 + curves.reduce((s, c) => s + 2 + c.length * 4, 0);
 	const view = new DataView(new ArrayBuffer(size));
 	let offset = 0;
@@ -42,36 +51,49 @@ export function encodeAcv(samples: ArrayLike<number>, options: AnchorOptions = {
 			put(input);
 		}
 	}
-	return new Uint8Array(view.buffer);
+	return { bytes: new Uint8Array(view.buffer), fidelity };
 }
 
-/** Lee la curva maestra de un .acv (version 4) y la interpola linealmente a 256 niveles. */
+export function encodeAcv(samples: ArrayLike<number>, options: AnchorOptions = {}): Uint8Array {
+	return encodeAcvWithReport(samples, options).bytes;
+}
+
+/**
+ * Lee la curva maestra de un .acv (version 4) y la reconstruye a 256 niveles con la misma
+ * spline que usa el codificador como aproximacion de Photoshop.
+ */
 export function decodeAcvMaster(data: Uint8Array): { anchors: Anchor[]; samples: Float64Array } {
 	const view = new DataView(data.buffer, data.byteOffset, data.byteLength);
 	if (data.byteLength < 6) throw new Error('.acv incompleto');
 	const version = view.getUint16(0, false);
 	if (version !== 4) throw new Error(`.acv version ${version} no soportada (se espera 4)`);
 	const count = view.getUint16(4, false);
-	if (count < 2 || count > 19 || data.byteLength < 6 + count * 4)
+	if (count < 2 || count > 19 || data.byteLength < 6 + count * 4) {
 		throw new Error('.acv con puntos invalidos');
+	}
 	const anchors: Anchor[] = [];
 	for (let i = 0; i < count; i++) {
 		const output = view.getUint16(6 + i * 4, false);
 		const input = view.getUint16(8 + i * 4, false);
+		if (output > 255 || input > 255) throw new Error('.acv con coordenadas fuera de 0..255');
 		anchors.push([input, output]);
 	}
 	anchors.sort((a, b) => a[0] - b[0]);
-	const samples = new Float64Array(256);
-	for (let x = 0; x < 256; x++) {
-		const j = anchors.findIndex(([input]) => input >= x);
-		if (j === -1) samples[x] = anchors.at(-1)![1];
-		else if (j === 0) samples[x] = anchors[0]![1];
-		else {
-			const [x0, y0] = anchors[j - 1]!;
-			const [x1, y1] = anchors[j]!;
-			samples[x] = y0 + ((x - x0) / (x1 - x0)) * (y1 - y0);
-		}
+	for (let i = 1; i < anchors.length; i++) {
+		if (anchors[i]![0] === anchors[i - 1]![0]) throw new Error('.acv con entradas repetidas');
 	}
+	const spline = naturalCubic(
+		anchors.map((a) => a[0]),
+		anchors.map((a) => a[1])
+	);
+	const first = anchors[0]!;
+	const last = anchors.at(-1)!;
+	const samples = Float64Array.from({ length: 256 }, (_, x) => {
+		// Fuera del primer/ultimo punto Photoshop mantiene el valor del extremo.
+		if (x <= first[0]) return first[1];
+		if (x >= last[0]) return last[1];
+		return Math.min(Math.max(spline(x), 0), 255);
+	});
 	return { anchors, samples };
 }
 

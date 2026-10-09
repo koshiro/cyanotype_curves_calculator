@@ -58,6 +58,8 @@ export interface Diagnostic {
 
 export type DiagnosticCode =
 	| 'TOO_FEW_VALUES'
+	| 'INVALID_MEASUREMENT'
+	| 'PARTIAL_COVERAGE'
 	| 'NOT_DECREASING'
 	| 'LOW_RANGE'
 	| 'WHITE_PLATEAU'

@@ -2,7 +2,8 @@ import { describe, expect, it } from 'vitest';
 import { evenlySpaced, syntheticPatches, syntheticResponse } from '../testing/synthetic';
 import { calibrate } from './calibrate';
 import { buildCorrection, lightnessToDensity } from './correction';
-import { aggregate, fitResponse } from './response';
+import { decodeAcvMaster, encodeAcv } from '../export/formats';
+import { aggregate, fitResponse, MAX_WEIGHT, TIE_TOLERANCE } from './response';
 import { CalibrationError, FIT_METHODS } from './types';
 
 describe('aggregate', () => {
@@ -100,19 +101,18 @@ describe('calibrate', () => {
 		expect(result.candidates).toHaveLength(3);
 		const [best] = result.candidates;
 		expect(best!.model.method).toBe(result.recommended);
-		for (const candidate of result.candidates.slice(1)) {
-			expect(best!.model.looRmse! - 0.05).toBeLessThanOrEqual(candidate.model.looRmse!);
-		}
-		const codes = best!.quality.diagnostics.map((d) => d.code);
+		const scores = result.candidates.map((c) => c.model.looRmse!);
+		expect(scores[0]! - Math.min(...scores)).toBeLessThan(TIE_TOLERANCE);
+		const codes = best!.report.diagnostics.map((d) => d.code);
 		expect(codes).toContain('BLACK_PLATEAU');
-		expect(best!.quality.densityRange).toBeGreaterThan(0.5);
+		expect(best!.report.densityRange).toBeGreaterThan(0.5);
 	});
 
 	it('combina rondas concatenando mediciones', () => {
 		const round1 = syntheticPatches(evenlySpaced(21), { seed: 1, noise: 0.3 });
 		const round2 = syntheticPatches([30, 60, 90, 120, 150, 180], { seed: 2, noise: 0.3 });
 		const result = calibrate([...round1, ...round2]);
-		expect(result.candidates[0]!.quality.uniqueValues).toBeGreaterThan(21);
+		expect(result.data.uniqueValues).toBeGreaterThan(21);
 	});
 
 	it('avisa de repeticiones dispares (iluminacion despareja)', () => {
@@ -121,8 +121,89 @@ describe('calibrate', () => {
 			{ value: 128, lightness: 40 },
 			{ value: 128, lightness: 70 }
 		];
-		const codes = calibrate(patches).candidates[0]!.quality.diagnostics.map((d) => d.code);
+		const codes = calibrate(patches).data.diagnostics.map((d) => d.code);
 		expect(codes).toContain('HIGH_REPLICATE_SPREAD');
+	});
+
+	it('con rango insuficiente devuelve los modelos con el error en vez de lanzar', () => {
+		const flat = syntheticPatches(evenlySpaced(21), { paper: 60, dmax: 52 });
+		const result = calibrate(flat);
+		expect(result.recommended).toBeNull();
+		for (const candidate of result.candidates) {
+			expect(candidate.curve).toBeNull();
+			expect(candidate.report.diagnostics[0]).toMatchObject({ code: 'LOW_RANGE', severity: 'error' });
+		}
+	});
+
+	it('avisa cuando las mediciones no cubren todo el rango del negativo', () => {
+		const partial = syntheticPatches([60, 80, 100, 120, 140, 160, 180, 200]);
+		const codes = calibrate(partial).data.diagnostics.map((d) => d.code);
+		expect(codes).toContain('PARTIAL_COVERAGE');
+	});
+});
+
+describe('mediciones invalidas y pesos', () => {
+	const base = syntheticPatches(evenlySpaced(21));
+
+	it.each([
+		['valor fuera de rango', { value: 300, lightness: 50 }],
+		['L* no finito', { value: 10, lightness: Number.NaN }],
+		['peso negativo', { value: 10, lightness: 80, weight: -1 }]
+	])('%s produce INVALID_MEASUREMENT', (_, patch) => {
+		try {
+			aggregate([...base, patch]);
+			expect.unreachable();
+		} catch (error) {
+			expect((error as CalibrationError).code).toBe('INVALID_MEASUREMENT');
+		}
+	});
+
+	it('peso 0 ignora el parche', () => {
+		const without = aggregate(base).find((p) => p.value === 128)!;
+		const withZero = aggregate([...base, { value: 128, lightness: 5, weight: 0 }]).find(
+			(p) => p.value === 128
+		)!;
+		expect(withZero.replicates).toBe(1);
+		expect(withZero.lightness).toBe(without.lightness);
+	});
+
+	it('peso infinito (parche saturado) se acota y la calibracion funciona', () => {
+		const patches = base.map((p, i) => (i === 3 ? { ...p, weight: Infinity } : p));
+		expect(aggregate(patches).every((p) => p.weight <= MAX_WEIGHT)).toBe(true);
+		expect(calibrate(patches).recommended).not.toBeNull();
+	});
+});
+
+describe('continuidad de la curva con datos ruidosos', () => {
+	// Antes del arreglo (bloques isotonicos planos y meseta fija de 0.5 L*) habia saltos de
+	// 25-47 niveles y la copia hecha con el .acv se desviaba hasta 5 L*.
+	it('smooth no salta, los interpolantes saltan poco y el .acv recomendado imprime fiel', () => {
+		const truth = syntheticResponse();
+		const worst: Record<string, number> = { smooth: 0, pchip: 0, linear: 0 };
+		let worstPrint = 0;
+		for (let seed = 1; seed <= 40; seed++) {
+			const result = calibrate(syntheticPatches(evenlySpaced(51), { noise: 0.8, seed }));
+			for (const candidate of result.candidates) {
+				const samples = candidate.curve!.samples;
+				for (let p = 1; p < 256; p++) {
+					worst[candidate.model.method] = Math.max(
+						worst[candidate.model.method]!,
+						samples[p]! - samples[p - 1]!
+					);
+				}
+				if (candidate.model.method !== result.recommended) continue;
+				// Error en la copia (L*) entre usar el .acv re-interpolado y la curva exacta.
+				const viaAcv = decodeAcvMaster(encodeAcv(samples)).samples;
+				for (let p = 0; p < 256; p++) {
+					const exact = truth(255 - Math.round(samples[p]!));
+					worstPrint = Math.max(worstPrint, Math.abs(truth(255 - viaAcv[p]!) - exact));
+				}
+			}
+		}
+		expect(worst.smooth).toBeLessThan(8);
+		expect(worst.pchip).toBeLessThan(25);
+		expect(worst.linear).toBeLessThan(25);
+		expect(worstPrint).toBeLessThan(1);
 	});
 });
 
@@ -136,14 +217,25 @@ describe('lightnessToDensity', () => {
 describe('diagnosticos y ruido', () => {
 	it('el ruido normal de escaneo no se reporta como medicion no monotona', () => {
 		const patches = syntheticPatches(evenlySpaced(256), { noise: 0.8, seed: 3 });
-		const codes = calibrate(patches).candidates[0]!.quality.diagnostics.map((d) => d.code);
-		expect(codes).not.toContain('NON_MONOTONIC_MEASUREMENTS');
+		const result = calibrate(patches);
+		expect(result.data.diagnostics.map((d) => d.code)).not.toContain('NON_MONOTONIC_MEASUREMENTS');
+	});
+
+	it('los diagnosticos de las mediciones no dependen del metodo', () => {
+		// Antes, pchip/lineal estimaban ruido ~0 desde sus propios residuos y avisaban en falso.
+		for (let seed = 1; seed <= 20; seed++) {
+			const result = calibrate(syntheticPatches(evenlySpaced(51), { noise: 1, seed }));
+			expect(result.data.diagnostics.map((d) => d.code)).not.toContain('NON_MONOTONIC_MEASUREMENTS');
+			for (const candidate of result.candidates) {
+				expect(candidate.report.diagnostics.map((d) => d.code)).not.toContain('NON_MONOTONIC_MEASUREMENTS');
+			}
+		}
 	});
 
 	it('un parche intercambiado si se reporta', () => {
 		const patches = syntheticPatches(evenlySpaced(21));
 		const swapped = patches.map((p) => (p.value === 102 ? { ...p, lightness: p.lightness - 25 } : p));
-		const codes = calibrate(swapped).candidates[0]!.quality.diagnostics.map((d) => d.code);
+		const codes = calibrate(swapped).data.diagnostics.map((d) => d.code);
 		expect(codes).toContain('NON_MONOTONIC_MEASUREMENTS');
 	});
 

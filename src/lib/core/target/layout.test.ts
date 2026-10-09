@@ -84,6 +84,21 @@ describe('buildTargetLayout', () => {
 		}
 	});
 
+	it.each([
+		['dpi', { dpi: 0 }],
+		['valores de referencia', { referenceValues: [Number.NaN] }],
+		['referencia fuera de rango', { referenceValues: [300] }],
+		['repeticiones negativas', { referenceReplicates: -1 }],
+		['parche nulo', { patchSizeMm: 0 }]
+	])('rechaza opciones invalidas: %s', (_, options) => {
+		try {
+			buildTargetLayout(options);
+			expect.unreachable();
+		} catch (error) {
+			expect((error as LayoutError).code).toBe('INVALID_OPTIONS');
+		}
+	});
+
 	it('256 pasos caben en carta con parches de 8 mm', () => {
 		expect(buildTargetLayout({ steps: 256, patchSizeMm: 8 }).patches).toHaveLength(268);
 	});

@@ -8,10 +8,16 @@ const GRID = 4096;
 
 export interface CorrectionOptions {
 	/**
-	 * Tolerancia en ΔL* para considerar que una zona ya es blanco de papel o negro maximo.
+	 * Tolerancia minima en ΔL* para considerar que una zona ya es blanco de papel o negro maximo.
 	 * Define donde termina la meseta util en cada extremo (por defecto 0.5, casi imperceptible).
 	 */
 	plateauTolerance?: number;
+	/**
+	 * Ruido de medicion estimado (σ en L*). La meseta se recorta en max(plateauTolerance, 2σ):
+	 * dentro de esa distancia del extremo, la pendiente medida no se distingue del ruido y
+	 * invertirla producira saltos espurios en la curva.
+	 */
+	noise?: number;
 	/** Rango minimo util en ΔL* para aceptar la calibracion (por defecto 15). */
 	minRange?: number;
 	/**
@@ -35,7 +41,7 @@ export interface CorrectionCurve {
 }
 
 export function buildCorrection(model: ResponseModel, options: CorrectionOptions = {}): CorrectionCurve {
-	const tolerance = options.plateauTolerance ?? 0.5;
+	const tolerance = Math.max(options.plateauTolerance ?? 0.5, 2 * (options.noise ?? 0));
 	const minRange = options.minRange ?? 15;
 	const target = options.target ?? ((t: number) => t);
 	const [n0, n1] = model.domain;

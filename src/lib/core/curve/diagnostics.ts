@@ -1,26 +1,14 @@
 /**
  * Metricas fisicas y diagnosticos accionables de una calibracion.
  * Reemplaza el "data score" ponderado arbitrario de la version Python.
+ *
+ * Hay dos informes separados:
+ * - `DataReport` describe las **mediciones** y es unico por calibracion: no cambia segun el
+ *   metodo de ajuste que se mire (retrocesos, huecos, dispersion, cobertura, ruido).
+ * - `ModelReport` describe cada **modelo** y su curva (mesetas, rango, error de ajuste).
  */
 import { lightnessToDensity, type CorrectionCurve } from './correction';
 import type { AggregatedPoint, Diagnostic, ResponseModel } from './types';
-
-export interface QualityReport {
-	patches: number;
-	uniqueValues: number;
-	/** L* del blanco de papel y del negro maximo medidos (modelo). */
-	paperLightness: number;
-	dmaxLightness: number;
-	/** Rango de densidad util del proceso (log10). */
-	densityRange: number;
-	/** Fraccion del rango del negativo (0..255) que realmente modula tono. */
-	usableFraction: number;
-	fitRmse: number;
-	looRmse: number | null;
-	/** Mayor salto de L* entre valores consecutivos del target. */
-	largestGap: { from: number; to: number; deltaL: number };
-	diagnostics: Diagnostic[];
-}
 
 export interface DiagnosticThresholds {
 	/** Meseta (en valores de negativo) a partir de la cual se avisa. */
@@ -33,6 +21,8 @@ export interface DiagnosticThresholds {
 	replicateSpread: number;
 	/** RMSE de validacion cruzada que indica un ajuste poco confiable. */
 	poorFit: number;
+	/** Distancia maxima (en valores de negativo) entre 0/255 y el primer/ultimo valor medido. */
+	coverageMargin: number;
 }
 
 export const DEFAULT_THRESHOLDS: DiagnosticThresholds = {
@@ -40,41 +30,62 @@ export const DEFAULT_THRESHOLDS: DiagnosticThresholds = {
 	gap: 8,
 	reversal: 2,
 	replicateSpread: 1.5,
-	poorFit: 2
+	poorFit: 2,
+	coverageMargin: 10
 };
 
-export function assessQuality(
+export interface DataReport {
+	patches: number;
+	uniqueValues: number;
+	/** σ robusta del ruido de medicion en L* (MAD de los residuos de un modelo suave). */
+	noise: number;
+	/** Rango de valores de negativo medidos. */
+	coverage: readonly [number, number];
+	/** Mayor salto de L* entre valores consecutivos del target. */
+	largestGap: { from: number; to: number; deltaL: number };
+	diagnostics: Diagnostic[];
+}
+
+export interface ModelReport {
+	/** L* del blanco de papel y del negro maximo segun el modelo. */
+	paperLightness: number;
+	dmaxLightness: number;
+	/** Rango de densidad util del proceso (log10); null si no se pudo construir la curva. */
+	densityRange: number | null;
+	/** Fraccion del rango del negativo (0..255) que realmente modula tono. */
+	usableFraction: number | null;
+	fitRmse: number;
+	looRmse: number | null;
+	diagnostics: Diagnostic[];
+}
+
+/** σ robusta (1.4826 · MAD) de los residuos de un modelo. */
+export function estimateNoise(points: readonly AggregatedPoint[], model: ResponseModel): number {
+	const residuals = points.map((p) => p.lightness - model.evaluate(p.value));
+	const center = median(residuals);
+	return 1.4826 * median(residuals.map((r) => Math.abs(r - center)));
+}
+
+export function assessData(
 	points: readonly AggregatedPoint[],
-	model: ResponseModel,
-	curve: CorrectionCurve,
+	noise: number,
 	thresholds: DiagnosticThresholds = DEFAULT_THRESHOLDS
-): QualityReport {
+): DataReport {
 	const diagnostics: Diagnostic[] = [];
-	const { whiteEdge, blackEdge } = curve.usable;
-	const { paper, dmax } = curve.lightness;
-	const [domainMin, domainMax] = model.domain;
-
-	if (whiteEdge - domainMin > thresholds.plateau) {
+	const coverage = [points[0]!.value, points.at(-1)!.value] as const;
+	if (coverage[0] > thresholds.coverageMargin || coverage[1] < 255 - thresholds.coverageMargin) {
 		diagnostics.push({
-			code: 'WHITE_PLATEAU',
+			code: 'PARTIAL_COVERAGE',
 			severity: 'warning',
-			params: { from: round(domainMin), to: round(whiteEdge) }
-		});
-	}
-	if (domainMax - blackEdge > thresholds.plateau) {
-		diagnostics.push({
-			code: 'BLACK_PLATEAU',
-			severity: 'warning',
-			params: { from: round(blackEdge), to: round(domainMax) }
+			params: { from: coverage[0], to: coverage[1] }
 		});
 	}
 
-	// Un retroceso solo cuenta si supera tanto el umbral fijo como el ruido observado en el
-	// ajuste (3σ de la diferencia de dos mediciones); si no, es ruido normal de escaneo. σ se
-	// estima con la MAD de los residuos para que un parche erroneo no infle su propio umbral.
-	const reversalLimit = Math.max(thresholds.reversal, 3 * Math.SQRT2 * robustNoise(points, model));
+	// Un retroceso solo cuenta si supera tanto el umbral fijo como el ruido observado
+	// (3σ de la diferencia de dos mediciones); si no, es ruido normal de escaneo.
+	const reversalLimit = Math.max(thresholds.reversal, 3 * Math.SQRT2 * noise);
 	let reversals = 0;
-	let largestGap = { from: points[0]!.value, to: points[0]!.value, deltaL: 0 };
+	let largestGap = { from: coverage[0], to: coverage[0], deltaL: 0 };
 	for (let i = 1; i < points.length; i++) {
 		const prev = points[i - 1]!;
 		const cur = points[i]!;
@@ -111,30 +122,69 @@ export function assessQuality(
 		}
 	}
 
+	return {
+		patches: points.reduce((s, p) => s + p.replicates, 0),
+		uniqueValues: points.length,
+		noise: Math.round(noise * 100) / 100,
+		coverage,
+		largestGap,
+		diagnostics
+	};
+}
+
+/**
+ * Informe de un modelo. `curve` es null cuando no se pudo construir (p. ej. rango
+ * insuficiente); en ese caso `failure` trae el diagnostico de error correspondiente.
+ */
+export function assessModel(
+	model: ResponseModel,
+	curve: CorrectionCurve | null,
+	failure: Diagnostic | null = null,
+	thresholds: DiagnosticThresholds = DEFAULT_THRESHOLDS
+): ModelReport {
+	const diagnostics: Diagnostic[] = failure ? [failure] : [];
+	const [domainMin, domainMax] = model.domain;
+	const paper = model.evaluate(domainMin);
+	const dmax = model.evaluate(domainMax);
+
+	if (curve) {
+		const { whiteEdge, blackEdge } = curve.usable;
+		if (whiteEdge - domainMin > thresholds.plateau) {
+			diagnostics.push({
+				code: 'WHITE_PLATEAU',
+				severity: 'warning',
+				params: { from: round(domainMin), to: round(whiteEdge) }
+			});
+		}
+		if (domainMax - blackEdge > thresholds.plateau) {
+			diagnostics.push({
+				code: 'BLACK_PLATEAU',
+				severity: 'warning',
+				params: { from: round(blackEdge), to: round(domainMax) }
+			});
+		}
+	}
+
 	const cv = model.looRmse ?? model.fitRmse;
 	if (cv > thresholds.poorFit) {
 		diagnostics.push({ code: 'POOR_FIT', severity: 'warning', params: { rmse: round(cv) } });
 	}
 
 	return {
-		patches: points.reduce((s, p) => s + p.replicates, 0),
-		uniqueValues: points.length,
 		paperLightness: round(paper),
 		dmaxLightness: round(dmax),
-		densityRange: Math.round((lightnessToDensity(dmax) - lightnessToDensity(paper)) * 100) / 100,
-		usableFraction: Math.round(((blackEdge - whiteEdge) / 255) * 1000) / 1000,
+		densityRange: curve
+			? Math.round(
+					(lightnessToDensity(curve.lightness.dmax) - lightnessToDensity(curve.lightness.paper)) * 100
+				) / 100
+			: null,
+		usableFraction: curve
+			? Math.round(((curve.usable.blackEdge - curve.usable.whiteEdge) / 255) * 1000) / 1000
+			: null,
 		fitRmse: round(model.fitRmse),
 		looRmse: model.looRmse === null ? null : round(model.looRmse),
-		largestGap,
 		diagnostics
 	};
-}
-
-/** σ robusta (1.4826 · MAD) de los residuos del modelo. */
-function robustNoise(points: readonly AggregatedPoint[], model: ResponseModel): number {
-	const residuals = points.map((p) => p.lightness - model.evaluate(p.value));
-	const center = median(residuals);
-	return 1.4826 * median(residuals.map((r) => Math.abs(r - center)));
 }
 
 function median(values: readonly number[]): number {

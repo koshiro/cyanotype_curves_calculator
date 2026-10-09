@@ -6,6 +6,7 @@ import {
 	decodeAmp,
 	decodeGimpCurves,
 	encodeAcv,
+	encodeAcvWithReport,
 	encodeAmp,
 	encodeCube,
 	encodeGimpCurves
@@ -16,8 +17,10 @@ const samples = Float64Array.from({ length: 256 }, (_, p) => 20 + 215 * Math.pow
 
 describe('selectAnchors', () => {
 	it('respeta la tolerancia con pocos puntos', () => {
-		const { anchors, maxError } = selectAnchors(samples);
-		expect(maxError).toBeLessThanOrEqual(0.5);
+		const { anchors, maxError, maxDrop, faithful } = selectAnchors(samples);
+		expect(faithful).toBe(true);
+		expect(maxError).toBeLessThanOrEqual(1);
+		expect(maxDrop).toBe(0);
 		expect(anchors.length).toBeLessThanOrEqual(16);
 		expect(anchors[0]![0]).toBe(0);
 		expect(anchors.at(-1)![0]).toBe(255);
@@ -25,7 +28,21 @@ describe('selectAnchors', () => {
 			anchors.map((a) => a[0]),
 			anchors.map((a) => a[1])
 		);
-		for (let x = 0; x < 256; x++) expect(Math.abs(spline(x) - samples[x]!)).toBeLessThan(1.01);
+		for (let x = 0; x < 256; x++) expect(Math.abs(spline(x) - samples[x]!)).toBeLessThan(1.51);
+	});
+
+	it('nunca devuelve una curva que Photoshop reconstruya con caidas sin declararlo', () => {
+		// Curva con codo brusco en el extremo: el caso que antes producia una spline no monotona.
+		const kinked = Float64Array.from({ length: 256 }, (_, p) => (p < 250 ? p * 0.6 : 150 + (p - 250) * 17));
+		const result = selectAnchors(kinked);
+		if (result.maxDrop > 0.25) expect(result.faithful).toBe(false);
+		expect(result.anchors.length).toBeLessThanOrEqual(16);
+	});
+
+	it('informa la fidelidad junto a los bytes del .acv', () => {
+		const { bytes, fidelity } = encodeAcvWithReport(samples);
+		expect(bytes.byteLength).toBeGreaterThan(0);
+		expect(fidelity.faithful).toBe(true);
 	});
 
 	it('una recta necesita solo los extremos', () => {
@@ -52,9 +69,19 @@ describe('.acv', () => {
 		expect(data.byteLength).toBe(4 + (2 + points * 4) + 4 * 10);
 	});
 
-	it('se puede volver a leer', () => {
+	it('se puede volver a leer con la misma spline del codificador', () => {
 		const { samples: decoded } = decodeAcvMaster(encodeAcv(samples));
-		for (let x = 0; x < 256; x++) expect(Math.abs(decoded[x]! - samples[x]!)).toBeLessThan(2.5);
+		for (let x = 0; x < 256; x++) expect(Math.abs(decoded[x]! - samples[x]!)).toBeLessThan(1.51);
+	});
+
+	it('rechaza coordenadas fuera de rango y entradas repetidas', () => {
+		const bad = encodeAcv(samples);
+		new DataView(bad.buffer).setUint16(6, 300);
+		expect(() => decodeAcvMaster(bad)).toThrow();
+		const dup = encodeAcv(samples);
+		const view = new DataView(dup.buffer);
+		view.setUint16(12, view.getUint16(8));
+		expect(() => decodeAcvMaster(dup)).toThrow();
 	});
 
 	it('rechaza versiones fuera de la especificacion', () => {

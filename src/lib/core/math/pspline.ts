@@ -85,7 +85,9 @@ export function fitPSpline(
 	const n = xs.length;
 	if (n < 3) throw new Error('fitPSpline: se requieren al menos 3 puntos');
 	const { segments, lambda, direction } = options;
-	const kappa = options.kappa ?? 1e7;
+	// La penalizacion de monotonia escala con el peso medio para dominar siempre al ajuste.
+	const meanWeight = weights.reduce((s, w) => s + w, 0) / weights.length;
+	const kappa = options.kappa ?? 1e7 * Math.max(meanWeight, 1);
 	const maxIterations = options.maxIterations ?? 50;
 	const xmin = Math.min(...xs);
 	const xmax = Math.max(...xs);
