@@ -1,6 +1,6 @@
 <script lang="ts">
 	import { goto } from '$app/navigation';
-	import { ChevronRight, Plus, Trash } from '@lucide/svelte';
+	import { ChevronRight, Plus, Trash, Upload } from '@lucide/svelte';
 	import { i18n } from '$lib/i18n/index.svelte';
 	import { projects } from '$lib/project/store.svelte';
 	import type { Project } from '$lib/project/types';
@@ -8,8 +8,35 @@
 	import ConfirmDialog from '$lib/ui/ConfirmDialog.svelte';
 	import Notice from '$lib/ui/Notice.svelte';
 	import { projectHref } from '$lib/routes';
+	import { importProject, ProjectImportError } from '$lib/project/transfer';
+	import type { MessageKey } from '$lib/i18n/index.svelte';
 
 	let creating = $state(false);
+	let importInput: HTMLInputElement | undefined = $state();
+	/** Se guarda la clave y no el texto, para que siga el idioma si el usuario lo cambia. */
+	let importMessage = $state<{
+		tone: 'success' | 'error';
+		key: MessageKey;
+		params: Record<string, string | number>;
+	} | null>(null);
+
+	async function importFile(file: File | undefined) {
+		if (!file) return;
+		try {
+			const project = importProject(await file.text(), new Set(projects.list.map((p) => p.id)));
+			await projects.save(project);
+			importMessage = { tone: 'success', key: 'projects.import.done', params: { name: title(project) } };
+		} catch (error) {
+			if (!(error instanceof ProjectImportError)) throw error;
+			importMessage = {
+				tone: 'error',
+				key: `projects.import.error.${error.code}` as MessageKey,
+				params: error.params
+			};
+		} finally {
+			if (importInput) importInput.value = '';
+		}
+	}
 	let pendingDelete = $state<Project | null>(null);
 	let confirmOpen = $state(false);
 
@@ -39,15 +66,33 @@
 </script>
 
 {#snippet plus()}<Plus size={18} aria-hidden="true" />{/snippet}
+{#snippet upload()}<Upload size={18} aria-hidden="true" />{/snippet}
 
 <div class="page">
 	<section class="intro">
 		<h1>{i18n.t('projects.title')}</h1>
 		<p class="lead">{i18n.t('projects.lead')}</p>
-		<Button variant="primary" icon={plus} loading={creating} onclick={createProject}
-			>{i18n.t('projects.new')}</Button
-		>
+		<div class="actions">
+			<Button variant="primary" icon={plus} loading={creating} onclick={createProject}
+				>{i18n.t('projects.new')}</Button
+			>
+			<Button variant="ghost" icon={upload} onclick={() => importInput?.click()}
+				>{i18n.t('projects.import')}</Button
+			>
+			<input
+				bind:this={importInput}
+				class="visually-hidden"
+				type="file"
+				accept=".json,application/json"
+				tabindex="-1"
+				onchange={(event) => importFile(event.currentTarget.files?.[0])}
+			/>
+		</div>
 	</section>
+
+	{#if importMessage}
+		<Notice tone={importMessage.tone}>{i18n.t(importMessage.key, importMessage.params)}</Notice>
+	{/if}
 
 	{#if !projects.persistent}
 		<Notice tone="warning">{i18n.t('projects.storage.unavailable')}</Notice>
@@ -119,6 +164,12 @@
 		font-size: var(--screen-title);
 		font-weight: var(--weight-semibold);
 		letter-spacing: -0.02em;
+	}
+
+	.actions {
+		display: flex;
+		flex-wrap: wrap;
+		gap: var(--space-2);
 	}
 
 	.lead {

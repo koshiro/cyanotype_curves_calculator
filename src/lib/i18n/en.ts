@@ -44,7 +44,7 @@ export const en: Messages = {
 	'steps.curve': 'Curve',
 	'steps.export': 'Export',
 	'steps.progress': 'Step {current} of {total}',
-	'steps.upcoming': 'Next steps: {steps} (under construction)',
+	'steps.upcoming': 'Next steps: {steps}',
 
 	'project.title': 'Process details',
 	'project.lead': 'Write down what defines this process. If any of it changes, the curve no longer applies.',
@@ -193,7 +193,6 @@ export const en: Messages = {
 	'curve.table.lightness': 'Measured L*',
 	'curve.table.replicates': 'Patches',
 	'curve.next': 'Continue to export',
-	'curve.next.soon': 'The Export step arrives in the next version.',
 	'curve.error.title': 'The curve could not be computed',
 	'curve.error.TOO_FEW_VALUES': 'At least {required} measured tone values are needed; there are {found}.',
 	'curve.error.NOT_DECREASING':
@@ -215,6 +214,41 @@ export const en: Messages = {
 	'curve.diag.POOR_FIT': 'The fit has an error of {rmse} L*: the measurements are noisy.',
 	'curve.diag.PARTIAL_COVERAGE': 'The measurements only cover negative values {from} to {to}.',
 	'curve.diag.LOW_RANGE': 'The usable tonal range is only {range} L* (minimum {required}).',
+	'export.title': 'Export the curve',
+	'export.lead':
+		'Download the curve for your editor. Workflow: open the positive photo, apply the curve, invert the image and print the negative.',
+	'export.none.title': 'No curve yet',
+	'export.none.body': 'Compute the curve with at least one scanned print.',
+	'export.none.action': 'Go to curve',
+	'export.method': 'Curve using the {method} method',
+	'export.files': 'Curve files',
+	'export.recommended': 'Recommended',
+	'export.amp.title': 'Photoshop, exact map (.amp)',
+	'export.amp.body':
+		'The exact 256 values. In Curves, presets menu, Load Preset. Works in RGB and Grayscale.',
+	'export.acv.title': 'Photoshop, editable curve (.acv)',
+	'export.acv.body': 'With {points} points you can tweak by hand. Photoshop re-interpolates it.',
+	'export.acv.warning':
+		'Photoshop rebuilds this curve with up to {error} levels of difference. Use the .amp for the exact result.',
+	'export.gimp.title': 'GIMP (.settings)',
+	'export.gimp.body': 'In Colors, Curves, Presets, Import settings from file.',
+	'export.cube.title': 'LUT for other editors (.cube)',
+	'export.cube.body':
+		'For Affinity Photo, Photopea, DaVinci Resolve and similar. Applies the correction only.',
+	'export.negative.title': 'LUT with inversion included (.cube)',
+	'export.negative.body': 'Turns the positive photo straight into the negative, in one step.',
+	'export.download': 'Download',
+	'export.download.file': 'Download {file}',
+	'export.project.title': 'Whole project',
+	'export.project.body':
+		'Saves a backup with the process, targets, measurements and curve. You can import it in another browser.',
+	'export.project.download': 'Export project (.json)',
+	'projects.import': 'Import project',
+	'projects.import.done': 'Project “{name}” imported.',
+	'projects.import.error.INVALID_JSON': 'The file is not valid JSON.',
+	'projects.import.error.NOT_A_PROJECT': 'The file is not a Cyano Curve project.',
+	'projects.import.error.UNSUPPORTED_VERSION':
+		'This project is from a version ({version}) this app does not know.',
 	'notfound.title': 'Project not found',
 	'notfound.body': 'It may have been deleted, or it is in another browser.'
 };

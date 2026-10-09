@@ -14,7 +14,7 @@ export const STEPS: readonly StepInfo[] = [
 	{ id: 'target', label: 'steps.target', ready: true },
 	{ id: 'scan', label: 'steps.scan', ready: true },
 	{ id: 'curve', label: 'steps.curve', ready: true },
-	{ id: 'export', label: 'steps.export', ready: false }
+	{ id: 'export', label: 'steps.export', ready: true }
 ];
 
 export function isStepId(value: string | null): value is StepId {

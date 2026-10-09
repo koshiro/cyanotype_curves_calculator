@@ -10,6 +10,7 @@
 	import TargetStep from '$lib/steps/TargetStep.svelte';
 	import ScanStep from '$lib/steps/ScanStep.svelte';
 	import CurveStep from '$lib/steps/CurveStep.svelte';
+	import ExportStep from '$lib/steps/ExportStep.svelte';
 	import { isStepId, type StepId } from '$lib/steps/steps';
 	import { homeHref, projectHref } from '$lib/routes';
 
@@ -26,7 +27,8 @@
 			...(project && project.name.trim() ? (['project'] as StepId[]) : []),
 			...(project && project.rounds.length > 0 ? (['target'] as StepId[]) : []),
 			...(project && project.rounds.some((r) => r.scan) ? (['scan'] as StepId[]) : []),
-			...(project && project.curve ? (['curve'] as StepId[]) : [])
+			// Con mediciones la curva queda calculada (con el metodo recomendado si no se eligio otro).
+			...(project && project.rounds.some((r) => r.scan) ? (['curve'] as StepId[]) : [])
 		])
 	);
 
@@ -88,7 +90,9 @@
 				{:else if step === 'scan'}
 					<ScanStep bind:project onsave={save} targetHref={hrefFor('target')} curveHref={hrefFor('curve')} />
 				{:else if step === 'curve'}
-					<CurveStep bind:project onsave={save} scanHref={hrefFor('scan')} />
+					<CurveStep bind:project onsave={save} scanHref={hrefFor('scan')} exportHref={hrefFor('export')} />
+				{:else if step === 'export'}
+					<ExportStep {project} curveHref={hrefFor('curve')} />
 				{/if}
 			</div>
 		</div>

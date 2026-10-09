@@ -3,7 +3,7 @@
 	import { untrack } from 'svelte';
 	import type { FitMethod, MeasuredPatch } from '$lib/core/curve/types';
 	import type { CurveComputation, CurveFailure } from '$lib/curve/compute';
-	import CurveWorker from '$lib/curve/curve.worker?worker';
+	import { includedPatches, runCurve } from '$lib/curve/run';
 	import { i18n, type MessageKey } from '$lib/i18n/index.svelte';
 	import type { Project } from '$lib/project/types';
 	import Button from '$lib/ui/Button.svelte';
@@ -15,9 +15,10 @@
 		project: Project;
 		onsave: () => Promise<void>;
 		scanHref: string;
+		exportHref: string;
 	}
 
-	let { project = $bindable(), onsave, scanHref }: Props = $props();
+	let { project = $bindable(), onsave, scanHref, exportHref }: Props = $props();
 
 	type View = 'correction' | 'response';
 	let view = $state<View>('correction');
@@ -29,9 +30,7 @@
 		project.rounds.map((round, i) => ({ print: i + 1, round })).filter((entry) => entry.round.scan)
 	);
 	const excluded = $derived(new Set(project.curve?.excludedPrints ?? []));
-	const patches = $derived<MeasuredPatch[]>(
-		scanned.filter((entry) => !excluded.has(entry.print)).flatMap((entry) => entry.round.scan!.patches)
-	);
+	const patches = $derived<MeasuredPatch[]>(includedPatches(project.rounds, project.curve?.excludedPrints));
 
 	// Recalcula en el worker cuando cambian las mediciones incluidas.
 	$effect(() => {
@@ -42,19 +41,17 @@
 			return;
 		}
 		computing = true;
-		const worker = new CurveWorker();
-		worker.onmessage = (event: MessageEvent<CurveComputation | CurveFailure>) => {
-			worker.terminate();
+		const run = runCurve(input);
+		void run.promise.then((outcome) => {
 			computing = false;
-			if (event.data.ok) {
-				result = event.data;
+			if (outcome.ok) {
+				result = outcome;
 				failure = null;
 			} else {
-				failure = event.data;
+				failure = outcome;
 			}
-		};
-		worker.postMessage(input);
-		return () => worker.terminate();
+		});
+		return () => run.cancel();
 	});
 
 	const method = $derived<FitMethod | null>(
@@ -340,8 +337,7 @@
 						</Notice>
 					{/each}
 
-					<Button variant="primary" disabled>{i18n.t('curve.next')}</Button>
-					<p class="hint">{i18n.t('curve.next.soon')}</p>
+					<Button variant="primary" href={exportHref}>{i18n.t('curve.next')}</Button>
 				</div>
 			</div>
 		{:else if computing}
@@ -423,7 +419,6 @@
 	}
 
 	.caption,
-	.hint,
 	.computing {
 		margin: 0;
 		color: var(--text-secondary);

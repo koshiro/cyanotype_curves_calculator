@@ -50,7 +50,7 @@ export const es = {
 	'steps.curve': 'Curva',
 	'steps.export': 'Exportar',
 	'steps.progress': 'Paso {current} de {total}',
-	'steps.upcoming': 'Próximos pasos: {steps} (en construcción)',
+	'steps.upcoming': 'Próximos pasos: {steps}',
 
 	'project.title': 'Datos del proceso',
 	'project.lead': 'Anota lo que define este proceso. Si cambias algo de esto, la curva deja de valer.',
@@ -205,7 +205,6 @@ export const es = {
 	'curve.table.lightness': 'L* medido',
 	'curve.table.replicates': 'Parches',
 	'curve.next': 'Continuar a exportar',
-	'curve.next.soon': 'El paso Exportar llega en la próxima versión.',
 	'curve.error.title': 'No se pudo calcular la curva',
 	'curve.error.TOO_FEW_VALUES': 'Se necesitan al menos {required} valores de tono medidos; hay {found}.',
 	'curve.error.NOT_DECREASING':
@@ -227,6 +226,41 @@ export const es = {
 	'curve.diag.POOR_FIT': 'El ajuste tiene un error de {rmse} L*: las mediciones son ruidosas.',
 	'curve.diag.PARTIAL_COVERAGE': 'Las mediciones solo cubren los valores {from} a {to} del negativo.',
 	'curve.diag.LOW_RANGE': 'El rango tonal útil es de solo {range} L* (mínimo {required}).',
+	'export.title': 'Exportar la curva',
+	'export.lead':
+		'Descarga la curva para tu editor. Flujo: abre la foto positiva, aplica la curva, invierte la imagen e imprime el negativo.',
+	'export.none.title': 'Aún no hay curva',
+	'export.none.body': 'Calcula la curva con al menos una impresión escaneada.',
+	'export.none.action': 'Ir a la curva',
+	'export.method': 'Curva con el método {method}',
+	'export.files': 'Archivos de curva',
+	'export.recommended': 'Recomendado',
+	'export.amp.title': 'Photoshop, mapa exacto (.amp)',
+	'export.amp.body':
+		'Los 256 valores exactos. En Curvas, menú de ajustes preestablecidos, Cargar ajuste preestablecido. Funciona en RGB y en escala de grises.',
+	'export.acv.title': 'Photoshop, curva editable (.acv)',
+	'export.acv.body': 'Con {points} puntos que puedes retocar a mano. Photoshop la vuelve a interpolar.',
+	'export.acv.warning':
+		'Photoshop reconstruye esta curva con hasta {error} niveles de diferencia. Usa el .amp si quieres el resultado exacto.',
+	'export.gimp.title': 'GIMP (.settings)',
+	'export.gimp.body': 'En Colores, Curvas, Ajustes preestablecidos, Importar ajustes desde archivo.',
+	'export.cube.title': 'LUT para otros editores (.cube)',
+	'export.cube.body':
+		'Para Affinity Photo, Photopea, DaVinci Resolve y similares. Aplica solo la corrección.',
+	'export.negative.title': 'LUT con inversión incluida (.cube)',
+	'export.negative.body': 'Convierte la foto positiva directamente en el negativo, en un solo paso.',
+	'export.download': 'Descargar',
+	'export.download.file': 'Descargar {file}',
+	'export.project.title': 'Proyecto completo',
+	'export.project.body':
+		'Guarda un respaldo con el proceso, los negativos, las mediciones y la curva. Puedes importarlo en otro navegador.',
+	'export.project.download': 'Exportar proyecto (.json)',
+	'projects.import': 'Importar proyecto',
+	'projects.import.done': 'Proyecto «{name}» importado.',
+	'projects.import.error.INVALID_JSON': 'El archivo no es un JSON válido.',
+	'projects.import.error.NOT_A_PROJECT': 'El archivo no es un proyecto de Cyano Curve.',
+	'projects.import.error.UNSUPPORTED_VERSION':
+		'Este proyecto es de una versión ({version}) que esta app no conoce.',
 	'notfound.title': 'No encontramos ese proyecto',
 	'notfound.body': 'Puede que se haya borrado o que esté en otro navegador.'
 } as const;
