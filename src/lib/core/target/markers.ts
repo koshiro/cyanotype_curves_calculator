@@ -77,6 +77,8 @@ export function decodeMarkerBits(bits: readonly (readonly number[])[]): DecodedM
 			}
 		}
 	}
+	// Con distancia minima 6 entre todas las palabras (ver test), dos lecturas a ≤ 2 errores no
+	// pueden empatar; el control de empate protege si alguna vez cambian los codigos.
 	if (!best || best.bitErrors > MAX_BIT_ERRORS || (tie && best.bitErrors > 0)) return null;
 	return best;
 }

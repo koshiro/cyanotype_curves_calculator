@@ -11,6 +11,7 @@ import { syntheticResponse } from '../testing/synthetic';
 import { detectMarkers, locateTarget, ScanError } from './detect';
 import { applyFlatField, estimateFlatField } from './flatfield';
 import { measurePatches, toMeasuredPatches } from './measure';
+import type { MeasuredPatch } from '../curve/types';
 
 /** Target chico a 100 DPI para que los tests corran rapido. */
 const layout: TargetLayout = buildTargetLayout({ dpi: 100, steps: 21, seed: 11 });
@@ -43,6 +44,23 @@ describe('marcas', () => {
 				expect(decodeMarkerBits(read)).toMatchObject({ id, bitErrors: 2 });
 			}
 		}
+	});
+
+	it('distancia de Hamming minima 6 entre todas las palabras (4 ids × 8 simetrias)', () => {
+		const words = ([0, 1, 2, 3] as const).flatMap((id) =>
+			[0, 1, 2, 3, 4, 5, 6, 7].map((t) => ({ id, t, bits: transformBits(canonicalBits(id), t).flat() }))
+		);
+		let min = Infinity;
+		for (let i = 0; i < words.length; i++) {
+			for (let j = i + 1; j < words.length; j++) {
+				const a = words[i]!;
+				const b = words[j]!;
+				// Dentro del mismo id solo cuentan las simetrias distintas de la identidad.
+				const d = a.bits.reduce((s, bit, k) => s + (bit !== b.bits[k] ? 1 : 0), 0);
+				min = Math.min(min, d);
+			}
+		}
+		expect(min).toBeGreaterThanOrEqual(6);
 	});
 
 	it('un patron cualquiera no se confunde con una marca', () => {
@@ -96,13 +114,17 @@ describe('deteccion de marcas', () => {
 		['copia al reves', { rotationDegrees: 180 }],
 		['copia espejada y girada', { rotationDegrees: 268, mirror: true }],
 		['escaneo a mayor resolucion', { rotationDegrees: 2, scale: 1.7 }],
-		['escaneo del negativo (polaridad normal)', { scanNegative: true, rotationDegrees: 4 }]
+		['escaneo del negativo (polaridad normal)', { scanNegative: true, rotationDegrees: 4 }],
+		['girada 45 grados', { rotationDegrees: 45 }],
+		['desenfocada', { rotationDegrees: 1, blur: 2 }],
+		['escaneo de 8 bits con ruido fuerte', { rotationDegrees: 179, noise: 0.04, quantize8: true }]
 	])('%s', (_, sim) => {
 		const scan = simulateScan(layout, { noise: 0.01, seed: 3, ...sim });
 		const location = locateTarget(scan, layout);
 		expect(location.markers.map((m) => m.id)).toEqual([0, 1, 2, 3]);
 		expect(location.mirrored).toBe(Boolean(sim.mirror));
-		expect(location.reprojectionError).toBeLessThan(1.5 * (sim.scale ?? 1));
+		// El desenfoque engrosa el borde de las marcas por igual: desplaza las esquinas, no los centros.
+		expect(location.reprojectionError).toBeLessThan(1.5 * (sim.scale ?? 1) + 1.5 * (sim.blur ?? 0));
 		const expectedPolarity = sim.scanNegative ? 'normal' : 'inverted';
 		for (const m of location.markers) expect(m.polarity).toBe(expectedPolarity);
 		// El centro del target debe caer donde lo puso la simulacion.
@@ -120,6 +142,7 @@ describe('deteccion de marcas', () => {
 			expect.unreachable();
 		} catch (error) {
 			expect((error as ScanError).code).toBe('MARKERS_NOT_FOUND');
+			expect((error as ScanError).params.missing).toBe('0,1,2,3');
 		}
 	});
 });
@@ -131,6 +154,17 @@ describe('medicion y calibracion de punta a punta', () => {
 
 	it('mide L* de cada parche con error menor a 0.5', () => {
 		for (const m of measurements) expect(Math.abs(m.lightness - truth(m.patch.value))).toBeLessThan(0.5);
+	});
+
+	it('con ruido uniforme todos los parches pesan lo mismo, sin importar el tono', () => {
+		expect(new Set(toMeasuredPatches(measurements).map((p) => p.weight))).toEqual(new Set([1]));
+	});
+
+	it('un parche con polvo pesa menos', () => {
+		const dusty = measurements.map((m, i) => (i === 7 ? { ...m, spread: m.spread * 20 + 2 } : m));
+		const weights = toMeasuredPatches(dusty).map((p) => p.weight);
+		expect(weights[7]).toBe(0.25);
+		expect(weights.filter((w) => w === 1)).toHaveLength(measurements.length - 1);
 	});
 
 	it('la densidad roja crece con la exposicion (n mayor = mas azul)', () => {
@@ -149,28 +183,51 @@ describe('medicion y calibracion de punta a punta', () => {
 	});
 });
 
-describe('campo plano', () => {
+describe('copia realista: variacion entre parches, polvo, desenfoque y 8 bits', () => {
+	it('mide y calibra sin perder la linealizacion', () => {
+		const scan = simulateScan(layout, {
+			rotationDegrees: 2,
+			noise: 0.02,
+			blur: 1,
+			patchVariation: 0.4,
+			dust: 40,
+			quantize8: true,
+			seed: 21
+		});
+		const location = locateTarget(scan, layout);
+		const measurements = measurePatches(scan, layout, location.homography);
+		// La mediana ignora el polvo: el error queda en el orden de la variacion entre parches.
+		const errors = measurements.map((m) => Math.abs(m.lightness - truth(m.patch.value)));
+		expect(Math.max(...errors)).toBeLessThan(2);
+		const best = calibrate(toMeasuredPatches(measurements)).candidates[0]!;
+		const { white, black } = best.curve!.lightness;
+		for (let p = 0; p <= 255; p += 15) {
+			const printed = truth(best.curve!.negative[p]!);
+			expect(Math.abs(printed - (black + ((white - black) * p) / 255))).toBeLessThan(1.5);
+		}
+	});
+});
+
+describe('campo plano sobre escaneos simulados', () => {
+	const midTones = (list: MeasuredPatch[]) => list.filter((p) => p.value >= 64 && p.value <= 192);
+	const error = (list: MeasuredPatch[]) =>
+		list.reduce((s, p) => s + Math.abs(p.lightness - truth(p.value)), 0);
+
 	it('detecta y corrige una exposicion despareja', () => {
-		const sheet = [layout.paper.widthMm, layout.paper.heightMm] as const;
-		const scan = simulateScan(layout, { exposureGradient: 0.06, noise: 0.005, seed: 9 });
+		const scan = simulateScan(layout, { exposureGradient: 0.1, noise: 0.005, seed: 9 });
 		const location = locateTarget(scan, layout);
 		const patches = toMeasuredPatches(measurePatches(scan, layout, location.homography));
-		const field = estimateFlatField(patches, sheet)!;
-		expect(field).not.toBeNull();
-		expect(field.spanL).toBeGreaterThan(5);
-
-		const spread = (list: typeof patches) => {
-			const refs = list.filter((p) => p.value === field.referenceValue).map((p) => p.lightness);
-			return Math.max(...refs) - Math.min(...refs);
-		};
-		expect(spread(applyFlatField(patches, field))).toBeLessThan(spread(patches) / 2);
+		const field = estimateFlatField(patches)!;
+		expect(field.significant).toBe(true);
+		expect(field.spanN).toBeGreaterThan(5);
+		expect(error(midTones(applyFlatField(patches, field)))).toBeLessThan(error(midTones(patches)) / 2);
 	});
 
-	it('sin degradado el campo estimado es casi plano', () => {
+	it('sin degradado no se declara despareja', () => {
 		const scan = simulateScan(layout, { noise: 0.005, seed: 9 });
 		const location = locateTarget(scan, layout);
 		const patches = toMeasuredPatches(measurePatches(scan, layout, location.homography));
-		expect(estimateFlatField(patches, [layout.paper.widthMm, layout.paper.heightMm])!.spanL).toBeLessThan(1);
+		expect(estimateFlatField(patches)?.significant ?? false).toBe(false);
 	});
 });
 
@@ -180,17 +237,30 @@ describe('analyzeScan', () => {
 		const scan = simulateScan(layout, {
 			rotationDegrees: 180,
 			mirror: true,
-			exposureGradient: 0.06,
+			exposureGradient: 0.1,
 			noise: 0.005
 		});
-		const result = analyzeScan(scan, layout);
+		const result = analyzeScan(scan, layout, { flatField: 'auto' });
 		const codes = result.diagnostics.map((d) => d.code);
 		expect(codes).toContain('MIRRORED');
 		expect(codes).toContain('UNEVEN_EXPOSURE');
 		expect(codes).not.toContain('EIGHT_BIT_SCAN');
 		expect(result.flatFieldApplied).toBe(true);
+		// Por defecto solo se informa.
+		expect(analyzeScan(scan, layout).flatFieldApplied).toBe(false);
 		expect(result.patches).toHaveLength(layout.patches.length);
 		expect(calibrate(result.patches).recommended).not.toBeNull();
+	});
+
+	it('avisa cuando el escaneo no corresponde al layout', async () => {
+		const { analyzeScan } = await import('./analyze');
+		const other = buildTargetLayout({ dpi: 100, steps: 21, seed: 999 });
+		const scan = simulateScan(other, { noise: 0.005 });
+		const codes = analyzeScan(scan, layout).diagnostics.map((d) => d.code);
+		expect(codes).toContain('LAYOUT_MISMATCH');
+		expect(
+			analyzeScan(simulateScan(layout, { noise: 0.005 }), layout).diagnostics.map((d) => d.code)
+		).not.toContain('LAYOUT_MISMATCH');
 	});
 
 	it('avisa de escaneos de 8 bits y de resolucion insuficiente', async () => {

@@ -52,13 +52,20 @@ export function encodeGrayPng(pixels: Uint8Array, width: number, height: number,
 }
 
 export function decodePng(bytes: Uint8Array): RasterImage {
-	let png = decode(bytes);
+	let png: ReturnType<typeof decode>;
+	try {
+		// checkCrc detecta bytes danados que de otro modo se decodificarian sin error.
+		png = decode(bytes, { checkCrc: true });
+	} catch {
+		throw new ImageFormatError('CORRUPT_FILE');
+	}
 	if (png.palette) {
 		png = { ...png, data: convertIndexedToRgb(png), channels: png.transparency ? 4 : 3, depth: 8 };
 	}
 	if (png.depth !== 8 && png.depth !== 16) {
 		throw new ImageFormatError('UNSUPPORTED_BIT_DEPTH', { depth: png.depth });
 	}
+	if (png.data.length < png.width * png.height * png.channels) throw new ImageFormatError('CORRUPT_FILE');
 	const max = png.depth === 16 ? 65535 : 255;
 	const colour = png.channels >= 3;
 	const channels = colour ? 3 : 1;

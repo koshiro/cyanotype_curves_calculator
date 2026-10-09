@@ -3,7 +3,7 @@
  *
  * Cada parche se muestrea en su zona central (para evitar bordes y sangrado) siguiendo la
  * homografia, se convierte a L* y a densidad roja, y se resume con la mediana (robusta a
- * polvo y rayas). El peso refleja la uniformidad interna del parche respecto del resto.
+ * polvo y rayas). Los parches atipicos (mucho mas irregulares que sus vecinos tonales) pesan menos.
  */
 import { redDensity, srgbToLightness } from '../image/color';
 import { applyHomography, type Homography } from '../image/homography';
@@ -80,18 +80,33 @@ export function measurePatches(
 	});
 }
 
+/** Un parche es atipico si su dispersion interna supera este multiplo de la de sus vecinos tonales. */
+const OUTLIER_FACTOR = 3;
+/** Vecindad tonal (en valores de n) para comparar dispersiones. */
+const TONAL_WINDOW = 32;
+
 /**
- * Convierte mediciones en parches para calibrar. El peso es relativo: 1 para un parche con
- * la dispersion interna tipica, menor para uno ruidoso (polvo, raya), acotado a [0.25, 4].
+ * Convierte mediciones en parches para calibrar.
+ *
+ * La dispersion interna crece en las sombras por la pendiente de L* y por el moteado propio del
+ * cianotipo, asi que no mide fiabilidad entre tonos distintos. Cada parche pesa 1, salvo que su
+ * dispersion supere `OUTLIER_FACTOR` veces la mediana de los parches de tono parecido (polvo,
+ * raya, burbuja): entonces pesa 0.25.
  */
 export function toMeasuredPatches(measurements: readonly PatchMeasurement[]): MeasuredPatch[] {
-	const typical = Math.max(median(measurements.map((m) => m.spread)), 1e-3);
-	return measurements.map((m) => ({
-		value: m.patch.value,
-		lightness: Math.min(Math.max(m.lightness, 0), 100),
-		weight: Math.min(Math.max((typical / Math.max(m.spread, 1e-3)) ** 2, 0.25), 4),
-		positionMm: m.centerMm
-	}));
+	return measurements.map((m) => {
+		const neighbours = measurements
+			.filter((o) => o !== m && Math.abs(o.patch.value - m.patch.value) <= TONAL_WINDOW)
+			.map((o) => o.spread);
+		const typical = neighbours.length > 0 ? median(neighbours) : m.spread;
+		const outlier = m.spread > OUTLIER_FACTOR * Math.max(typical, 0.05);
+		return {
+			value: m.patch.value,
+			lightness: Math.min(Math.max(m.lightness, 0), 100),
+			weight: outlier ? 0.25 : 1,
+			positionMm: m.centerMm
+		};
+	});
 }
 
 export function median(values: readonly number[]): number {

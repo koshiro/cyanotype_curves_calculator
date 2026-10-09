@@ -7,35 +7,42 @@ import { decodeImage, fromRgba, sniffImage } from './decode';
 import { ImageFormatError } from './errors';
 import { encodeGrayPng } from './png';
 
-/** TIFF minimo sin comprimir (gris o RGB, 8 o 16 bits) para tests. */
+/** TIFF minimo sin comprimir para tests (gris, RGB o RGBA; 8 o 16 bits). */
 function makeTiff(options: {
 	width: number;
 	height: number;
-	samples: 1 | 3;
+	samples: 1 | 3 | 4;
 	bits: 8 | 16;
 	littleEndian: boolean;
 	values: (i: number, c: number) => number;
-	dpi?: number;
+	photometric?: number;
+	resolution?: [number, number];
+	unit?: number;
+	orientation?: number;
 }): Uint8Array {
 	const { width, height, samples, bits, littleEndian: le } = options;
 	const bytesPerSample = bits / 8;
 	const pixelBytes = width * height * samples * bytesPerSample;
-	const entries: [number, number, number, number][] = []; // tag, tipo, cantidad, valor
 	const bitsOffset = 8;
 	const resolutionOffset = bitsOffset + 8;
 	const dataOffset = resolutionOffset + 8;
-	entries.push([256, 3, 1, width]);
-	entries.push([257, 3, 1, height]);
-	entries.push([258, 3, samples, samples === 1 ? bits : bitsOffset]);
-	entries.push([259, 3, 1, 1]);
-	entries.push([262, 3, 1, samples === 3 ? 2 : 1]);
-	entries.push([273, 4, 1, dataOffset]);
-	entries.push([277, 3, 1, samples]);
-	entries.push([278, 3, 1, height]);
-	entries.push([279, 4, 1, pixelBytes]);
-	entries.push([282, 5, 1, resolutionOffset]);
-	entries.push([284, 3, 1, 1]);
-	entries.push([296, 3, 1, 2]);
+	const entries: [number, number, number, number][] = [
+		[256, 3, 1, width],
+		[257, 3, 1, height],
+		[258, 3, samples, samples === 1 ? bits : bitsOffset],
+		[259, 3, 1, 1],
+		[262, 3, 1, options.photometric ?? (samples === 1 ? 1 : 2)],
+		[273, 4, 1, dataOffset],
+		[277, 3, 1, samples],
+		[278, 3, 1, height],
+		[279, 4, 1, pixelBytes],
+		[282, 5, 1, resolutionOffset],
+		[284, 3, 1, 1],
+		[296, 3, 1, options.unit ?? 2]
+	];
+	if (options.orientation) entries.splice(5, 0, [274, 3, 1, options.orientation]);
+	if (samples === 4) entries.push([338, 3, 1, 2]);
+	entries.sort((a, b) => a[0] - b[0]);
 	const ifdOffset = dataOffset + pixelBytes;
 	const total = ifdOffset + 2 + entries.length * 12 + 4;
 	const view = new DataView(new ArrayBuffer(total));
@@ -43,9 +50,11 @@ function makeTiff(options: {
 	view.setUint8(1, le ? 0x49 : 0x4d);
 	view.setUint16(2, 42, le);
 	view.setUint32(4, ifdOffset, le);
-	for (let k = 0; k < 3; k++) view.setUint16(bitsOffset + k * 2, bits, le);
-	view.setUint32(resolutionOffset, options.dpi ?? 300, le);
-	view.setUint32(resolutionOffset + 4, 1, le);
+	for (let k = 0; k < 4; k++)
+		if (bitsOffset + k * 2 < resolutionOffset) view.setUint16(bitsOffset + k * 2, bits, le);
+	const [num, den] = options.resolution ?? [300, 1];
+	view.setUint32(resolutionOffset, num, le);
+	view.setUint32(resolutionOffset + 4, den, le);
 	for (let i = 0; i < width * height; i++) {
 		for (let c = 0; c < samples; c++) {
 			const offset = dataOffset + (i * samples + c) * bytesPerSample;
@@ -64,6 +73,16 @@ function makeTiff(options: {
 	});
 	view.setUint32(total - 4, 0, le);
 	return new Uint8Array(view.buffer);
+}
+
+function expectCode(run: () => unknown, code: string): void {
+	try {
+		run();
+		expect.unreachable();
+	} catch (error) {
+		expect(error).toBeInstanceOf(ImageFormatError);
+		expect((error as ImageFormatError).code).toBe(code);
+	}
 }
 
 describe('PNG', () => {
@@ -120,12 +139,124 @@ describe('TIFF', () => {
 			bits: 8,
 			littleEndian: true,
 			values: (i) => i * 60,
-			dpi: 600
+			resolution: [600, 1]
 		});
 		const image = decodeImage(tiff);
 		expect(image.channels).toBe(1);
 		expect(image.dpi).toBe(600);
 		expect(Array.from(image.data, (v) => Math.round(v * 255))).toEqual([0, 60, 120, 180]);
+	});
+});
+
+describe('TIFF: variantes', () => {
+	it('descarta el alfa (muestra extra) en RGBA de 16 bits', () => {
+		const tiff = makeTiff({
+			width: 2,
+			height: 1,
+			samples: 4,
+			bits: 16,
+			littleEndian: true,
+			values: (i, c) => (c === 3 ? 0 : 20000 + i * 1000 + c)
+		});
+		const image = decodeImage(tiff);
+		expect(image.channels).toBe(3);
+		expect(image.data[3]).toBeCloseTo(21000 / 65535, 6);
+	});
+
+	it('gris de 16 bits y WhiteIsZero', () => {
+		const gray = decodeImage(
+			makeTiff({ width: 2, height: 1, samples: 1, bits: 16, littleEndian: false, values: (i) => i * 65535 })
+		);
+		expect(Array.from(gray.data)).toEqual([0, 1]);
+		const inverted = decodeImage(
+			makeTiff({
+				width: 2,
+				height: 1,
+				samples: 1,
+				bits: 8,
+				littleEndian: true,
+				photometric: 0,
+				values: (i) => i * 255
+			})
+		);
+		expect(Array.from(inverted.data)).toEqual([1, 0]);
+	});
+
+	it('resolucion racional, en centimetros o sin unidad', () => {
+		const base = {
+			width: 1,
+			height: 1,
+			samples: 1 as const,
+			bits: 8 as const,
+			littleEndian: true,
+			values: () => 0
+		};
+		expect(decodeImage(makeTiff({ ...base, resolution: [1200, 2] })).dpi).toBe(600);
+		expect(decodeImage(makeTiff({ ...base, resolution: [118, 1], unit: 3 })).dpi).toBe(300);
+		expect(decodeImage(makeTiff({ ...base, resolution: [72, 1], unit: 1 })).dpi).toBeUndefined();
+	});
+
+	it('informa la orientacion declarada', () => {
+		const image = decodeImage(
+			makeTiff({
+				width: 1,
+				height: 1,
+				samples: 1,
+				bits: 8,
+				littleEndian: true,
+				values: () => 0,
+				orientation: 2
+			})
+		);
+		expect(image.orientation).toBe(2);
+	});
+});
+
+describe('archivos danados', () => {
+	const png = encodeGrayPng(new Uint8Array(64).fill(128), 8, 8, 300);
+
+	it('PNG truncado', () => {
+		expectCode(() => decodeImage(png.subarray(0, png.length - 20)), 'CORRUPT_FILE');
+	});
+
+	it('PNG con un byte alterado en los datos', () => {
+		const damaged = png.slice();
+		damaged[damaged.length - 20] = damaged[damaged.length - 20]! ^ 0xff;
+		expectCode(() => decodeImage(damaged), 'CORRUPT_FILE');
+	});
+
+	it('TIFF truncado', () => {
+		const tiff = makeTiff({ width: 4, height: 4, samples: 3, bits: 16, littleEndian: true, values: () => 1 });
+		expectCode(() => decodeImage(tiff.subarray(0, 40)), 'CORRUPT_FILE');
+	});
+});
+
+describe('PNG: variantes', () => {
+	it('gris con alfa y paleta', () => {
+		const grayAlpha = encode({
+			width: 2,
+			height: 1,
+			data: new Uint8Array([10, 255, 200, 0]),
+			channels: 2,
+			depth: 8
+		});
+		const image = decodeImage(grayAlpha);
+		expect(image.channels).toBe(1);
+		expect(Math.round(image.data[1]! * 255)).toBe(200);
+		const indexed = encode({
+			width: 2,
+			height: 1,
+			data: new Uint8Array([0, 1]),
+			channels: 1,
+			depth: 8,
+			palette: [
+				[255, 0, 0],
+				[0, 0, 255]
+			]
+		});
+		const rgb = decodeImage(indexed);
+		expect(rgb.channels).toBe(3);
+		expect(Array.from(rgb.data, (v) => Math.round(v * 255))).toEqual([255, 0, 0, 0, 0, 255]);
 	});
 });
 

@@ -1,6 +1,8 @@
 /**
  * TIFF: lectura de escaneos de 8 o 16 bits (gris o RGB, sin comprimir, LZW, deflate o
  * PackBits) con utif2. utif2 deja los datos de 16 bits en orden little-endian.
+ *
+ * Todo fallo de lectura se informa como `ImageFormatError` con codigo estable.
  */
 import * as UTIF from 'utif2';
 import type { RasterImage } from '../core/image/types';
@@ -11,18 +13,40 @@ function tag(ifd: UTIF.IFD, id: number): number[] | undefined {
 	return Array.isArray(value) ? (value as number[]) : undefined;
 }
 
+/** Usa el ArrayBuffer original si el arreglo lo cubre entero; si no, copia solo lo necesario. */
+function ownBuffer(bytes: Uint8Array): ArrayBuffer {
+	if (
+		bytes.byteOffset === 0 &&
+		bytes.byteLength === bytes.buffer.byteLength &&
+		bytes.buffer instanceof ArrayBuffer
+	) {
+		return bytes.buffer;
+	}
+	return bytes.slice().buffer as ArrayBuffer;
+}
+
+/** Imagen principal: la de mayor area que no sea una miniatura (NewSubfileType bit 0). */
+function mainImage(ifds: UTIF.IFD[]): UTIF.IFD | undefined {
+	const candidates = ifds.filter(
+		(ifd) => tag(ifd, 256) && tag(ifd, 257) && ((tag(ifd, 254)?.[0] ?? 0) & 1) === 0
+	);
+	const area = (ifd: UTIF.IFD) => tag(ifd, 256)![0]! * tag(ifd, 257)![0]!;
+	return candidates.sort((a, b) => area(b) - area(a))[0] ?? ifds[0];
+}
+
 export function decodeTiff(bytes: Uint8Array): RasterImage {
-	const buffer = bytes.buffer.slice(bytes.byteOffset, bytes.byteOffset + bytes.byteLength) as ArrayBuffer;
-	let ifds: UTIF.IFD[];
+	const buffer = ownBuffer(bytes);
+	let ifd: UTIF.IFD | undefined;
 	try {
-		ifds = UTIF.decode(buffer);
+		ifd = mainImage(UTIF.decode(buffer));
+		if (!ifd) throw new Error('sin imagenes');
+		UTIF.decodeImage(buffer, ifd);
 	} catch {
 		throw new ImageFormatError('CORRUPT_FILE');
 	}
-	const ifd = ifds[0];
-	if (!ifd) throw new ImageFormatError('CORRUPT_FILE');
-	UTIF.decodeImage(buffer, ifd);
 	const { width, height } = ifd;
+	if (!(width > 0 && height > 0) || !ifd.data) throw new ImageFormatError('CORRUPT_FILE');
+
 	const bits = tag(ifd, 258)?.[0] ?? 1;
 	const samples = tag(ifd, 277)?.[0] ?? tag(ifd, 258)?.length ?? 1;
 	const photometric = tag(ifd, 262)?.[0] ?? 1;
@@ -35,22 +59,30 @@ export function decodeTiff(bytes: Uint8Array): RasterImage {
 		const channels: 1 | 3 = photometric === 2 ? 3 : 1;
 		if (samples < channels) throw new ImageFormatError('UNSUPPORTED_LAYOUT', { samples });
 		const total = width * height;
-		const data = new Float32Array(total * channels);
 		const raw = ifd.data;
-		const view = new DataView(raw.buffer, raw.byteOffset, raw.byteLength);
+		if (raw.byteLength < total * samples * (bits / 8)) throw new ImageFormatError('CORRUPT_FILE');
+		const data = new Float32Array(total * channels);
 		const max = bits === 16 ? 65535 : 255;
+		const words = bits === 16 ? new DataView(raw.buffer, raw.byteOffset, raw.byteLength) : null;
 		for (let i = 0; i < total; i++) {
 			for (let c = 0; c < channels; c++) {
 				const index = i * samples + c;
-				const value = bits === 16 ? view.getUint16(index * 2, true) : raw[index]!;
+				const value = words ? words.getUint16(index * 2, true) : raw[index]!;
 				// WhiteIsZero (0) invierte el gris.
 				data[i * channels + c] = photometric === 0 ? 1 - value / max : value / max;
 			}
 		}
 		image = { width, height, channels, bitDepth: bits, data };
 	} else {
-		// Otros casos (paleta, JPEG interno, 1 bit): se usa la conversion de utif2 a 8 bits.
-		const rgba = UTIF.toRGBA8(ifd);
+		// Otros casos (paleta, JPEG interno, 1 bit): conversion de utif2 a 8 bits.
+		let rgba: Uint8Array;
+		try {
+			rgba = UTIF.toRGBA8(ifd);
+		} catch {
+			throw new ImageFormatError('UNSUPPORTED_FORMAT', { bits, photometric });
+		}
+		if (rgba.length < width * height * 4)
+			throw new ImageFormatError('UNSUPPORTED_FORMAT', { bits, photometric });
 		const data = new Float32Array(width * height * 3);
 		for (let i = 0; i < width * height; i++) {
 			for (let c = 0; c < 3; c++) data[i * 3 + c] = rgba[i * 4 + c]! / 255;
@@ -62,9 +94,12 @@ export function decodeTiff(bytes: Uint8Array): RasterImage {
 	const rational = ifd['t282'] as unknown;
 	const pair = Array.isArray(rational) ? (rational[0] as unknown) : undefined;
 	const resolution = Array.isArray(pair) ? Number(pair[0]) / Number(pair[1] || 1) : Number(pair);
+	// ResolutionUnit: 1 = sin unidad (no es DPI), 2 = pulgada (por defecto), 3 = cm.
 	const unit = tag(ifd, 296)?.[0] ?? 2;
-	if (Number.isFinite(resolution) && resolution > 0) {
+	if (Number.isFinite(resolution) && resolution > 0 && unit !== 1) {
 		image.dpi = Math.round(unit === 3 ? resolution * 2.54 : resolution);
 	}
+	const orientation = tag(ifd, 274)?.[0];
+	if (orientation && orientation >= 1 && orientation <= 8) image.orientation = orientation;
 	return image;
 }

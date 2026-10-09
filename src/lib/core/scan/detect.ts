@@ -17,7 +17,7 @@ import {
 	type Homography,
 	type Point
 } from '../image/homography';
-import { sampleBilinear, toGray, type RasterImage } from '../image/types';
+import { luminanceAt, type RasterImage } from '../image/types';
 import type { TargetLayout } from '../target/layout';
 import { decodeMarkerBits, MARKER_MODULES, SQUARE_TRANSFORMS, type MarkerId } from '../target/markers';
 
@@ -61,10 +61,11 @@ export interface TargetLocation {
 
 const DETECTION_MAX_SIDE = 1600;
 
-export function detectMarkers(image: RasterImage): DetectedMarker[] {
-	const gray = toGray(image);
+/** Todas las lecturas validas de marcas, de mejor a peor (puede haber varias por id). */
+export function detectMarkerCandidates(image: RasterImage): DetectedMarker[] {
 	const factor = Math.max(1, Math.ceil(Math.max(image.width, image.height) / DETECTION_MAX_SIDE));
-	const small = downsample(gray, image.width, image.height, factor);
+	// La luminancia se calcula al reducir: no se crea un plano gris a resolucion completa.
+	const small = downsampleLuminance(image, factor);
 	const minDim = Math.min(small.width, small.height);
 	const radius = Math.max(3, Math.round(minDim * 0.04));
 	const integral = integralImage(small.data, small.width, small.height);
@@ -74,31 +75,24 @@ export function detectMarkers(image: RasterImage): DetectedMarker[] {
 		const mask = threshold(small.data, small.width, small.height, integral, radius, polarity);
 		for (const hull of candidateHulls(mask, small.width, small.height, minDim)) {
 			const rect = minAreaRectangle(hull).map(([x, y]) => [x * factor, y * factor] as Point);
-			const marker = readMarker(gray, image.width, image.height, rect);
+			const marker = readMarker(image, rect);
 			if (marker) found.push(marker);
 		}
 	}
+	return found.sort((a, b) => a.bitErrors - b.bitErrors || b.contrast - a.contrast);
+}
 
-	// Una misma marca puede aparecer en varios candidatos: se queda la mejor lectura.
+/** La mejor lectura de cada id. */
+export function detectMarkers(image: RasterImage): DetectedMarker[] {
 	const best = new Map<MarkerId, DetectedMarker>();
-	for (const marker of found) {
-		const current = best.get(marker.id);
-		if (
-			!current ||
-			marker.bitErrors < current.bitErrors ||
-			(marker.bitErrors === current.bitErrors && marker.contrast > current.contrast)
-		) {
-			best.set(marker.id, marker);
-		}
-	}
+	for (const marker of detectMarkerCandidates(image)) if (!best.has(marker.id)) best.set(marker.id, marker);
 	return [...best.values()].sort((a, b) => a.id - b.id);
 }
 
-export function locateTarget(image: RasterImage, layout: TargetLayout): TargetLocation {
-	const markers = detectMarkers(image);
-	if (markers.length < 4) {
-		throw new ScanError('MARKERS_NOT_FOUND', { found: markers.map((m) => m.id).join(',') });
-	}
+/** Candidatos por id que se combinan al ubicar el target. */
+const CANDIDATES_PER_ID = 3;
+
+function fitMarkers(markers: readonly DetectedMarker[], layout: TargetLayout) {
 	const from: Point[] = [];
 	const to: Point[] = [];
 	for (const marker of markers) {
@@ -117,7 +111,43 @@ export function locateTarget(image: RasterImage, layout: TargetLayout): TargetLo
 		});
 	}
 	const homography = estimateHomography(from, to);
-	const error = reprojectionError(homography, from, to);
+	return { homography, error: reprojectionError(homography, from, to) };
+}
+
+export function locateTarget(image: RasterImage, layout: TargetLayout): TargetLocation {
+	const byId = new Map<MarkerId, DetectedMarker[]>();
+	for (const marker of detectMarkerCandidates(image)) {
+		const list = byId.get(marker.id) ?? [];
+		if (list.length < CANDIDATES_PER_ID) list.push(marker);
+		byId.set(marker.id, list);
+	}
+	const ids: MarkerId[] = [0, 1, 2, 3];
+	const missing = ids.filter((id) => !byId.has(id));
+	if (missing.length > 0) {
+		throw new ScanError('MARKERS_NOT_FOUND', {
+			found: ids.filter((id) => byId.has(id)).join(','),
+			missing: missing.join(',')
+		});
+	}
+
+	// Una lectura falsa de un id podria ganarle a la verdadera: se prueban las combinaciones
+	// de candidatos y se queda la geometricamente consistente (menor error de reproyeccion).
+	let best: {
+		markers: DetectedMarker[];
+		homography: ReturnType<typeof estimateHomography>;
+		error: number;
+	} | null = null;
+	const pick = (index: number, chosen: DetectedMarker[]) => {
+		if (index === ids.length) {
+			const fit = fitMarkers(chosen, layout);
+			if (!best || fit.error < best.error) best = { markers: [...chosen], ...fit };
+			return;
+		}
+		for (const candidate of byId.get(ids[index]!)!) pick(index + 1, [...chosen, candidate]);
+	};
+	pick(0, []);
+	const { markers, homography, error } = best!;
+
 	const markerSide = Math.hypot(
 		markers[0]!.corners[1][0] - markers[0]!.corners[0][0],
 		markers[0]!.corners[1][1] - markers[0]!.corners[0][1]
@@ -145,23 +175,26 @@ export function locateTarget(image: RasterImage, layout: TargetLayout): TargetLo
 // ---------------------------------------------------------------------------------------
 // Imagen reducida, imagen integral y umbral local
 
-function downsample(gray: Float32Array, width: number, height: number, factor: number) {
-	if (factor === 1) return { data: gray, width, height };
+function downsampleLuminance(image: RasterImage, factor: number) {
+	const { width, height, channels, data } = image;
 	const w = Math.floor(width / factor);
 	const h = Math.floor(height / factor);
-	const data = new Float32Array(w * h);
+	const out = new Float32Array(w * h);
 	const area = factor * factor;
 	for (let y = 0; y < h; y++) {
 		for (let x = 0; x < w; x++) {
 			let sum = 0;
 			for (let dy = 0; dy < factor; dy++) {
-				const row = (y * factor + dy) * width + x * factor;
-				for (let dx = 0; dx < factor; dx++) sum += gray[row + dx]!;
+				let i = ((y * factor + dy) * width + x * factor) * channels;
+				for (let dx = 0; dx < factor; dx++, i += channels) {
+					sum +=
+						channels === 1 ? data[i]! : 0.2126 * data[i]! + 0.7152 * data[i + 1]! + 0.0722 * data[i + 2]!;
+				}
 			}
-			data[y * w + x] = sum / area;
+			out[y * w + x] = sum / area;
 		}
 	}
-	return { data, width: w, height: h };
+	return { data: out, width: w, height: h };
 }
 
 function integralImage(data: Float32Array, width: number, height: number): Float64Array {
@@ -369,7 +402,7 @@ const UNIT_SQUARE: Point[] = [
 	[0, 1]
 ];
 
-function readMarker(gray: Float32Array, width: number, height: number, rect: Point[]): DetectedMarker | null {
+function readMarker(image: RasterImage, rect: Point[]): DetectedMarker | null {
 	const toImage = estimateHomography(UNIT_SQUARE, rect);
 	const module = 1 / MARKER_MODULES;
 	const sampleAt = (u: number, v: number): number => {
@@ -377,7 +410,7 @@ function readMarker(gray: Float32Array, width: number, height: number, rect: Poi
 		for (const du of [-0.2, 0, 0.2]) {
 			for (const dv of [-0.2, 0, 0.2]) {
 				const [x, y] = applyHomography(toImage, [u + du * module, v + dv * module]);
-				sum += sampleBilinear(gray, width, height, x, y);
+				sum += luminanceAt(image, x, y);
 			}
 		}
 		return sum / 9;
