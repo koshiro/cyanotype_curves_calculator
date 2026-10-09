@@ -8,6 +8,7 @@
 	import ProjectStep from '$lib/steps/ProjectStep.svelte';
 	import StepNav from '$lib/steps/StepNav.svelte';
 	import TargetStep from '$lib/steps/TargetStep.svelte';
+	import ScanStep from '$lib/steps/ScanStep.svelte';
 	import { isStepId, type StepId } from '$lib/steps/steps';
 	import { homeHref, projectHref } from '$lib/routes';
 
@@ -22,7 +23,8 @@
 	const completed = $derived(
 		new Set<StepId>([
 			...(project && project.name.trim() ? (['project'] as StepId[]) : []),
-			...(project && project.rounds.length > 0 ? (['target'] as StepId[]) : [])
+			...(project && project.rounds.length > 0 ? (['target'] as StepId[]) : []),
+			...(project && project.rounds.some((r) => r.scan) ? (['scan'] as StepId[]) : [])
 		])
 	);
 
@@ -81,6 +83,8 @@
 					<ProjectStep bind:project onchange={scheduleSave} {saved} nextHref={hrefFor('target')} />
 				{:else if step === 'target'}
 					<TargetStep bind:project onsave={save} />
+				{:else if step === 'scan'}
+					<ScanStep bind:project onsave={save} targetHref={hrefFor('target')} />
 				{/if}
 			</div>
 		</div>

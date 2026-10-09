@@ -83,8 +83,7 @@ export const en: Messages = {
 	'target.downloaded': 'Target for print {print} downloaded.',
 	'target.downloaded.new':
 		'You changed the options after scanning the previous print: this is print {print}.',
-	'target.downloaded.next':
-		'Print it, expose it and let the print dry. The scan step arrives in the next version.',
+	'target.downloaded.next': 'Print it, expose it and let the print dry. Then scan it in the next step.',
 	'target.preview': 'Target preview',
 	'target.preview.unavailable': 'No preview: fix the options.',
 	'target.print.title': 'Printing',
@@ -98,6 +97,56 @@ export const en: Messages = {
 		'The sheet is too small for the registration marks and patches. Use at least {minWidth} × {minHeight} mm.',
 	'target.error.INVALID_OPTIONS': 'Check the values: one is out of range.',
 
+	'scan.title': 'Scan of the print',
+	'scan.lead': 'Scan the dry print, whole and uncropped: all four corner marks must be visible.',
+	'scan.print': 'Print',
+	'scan.print.option': 'Print {print}',
+	'scan.none.title': 'Print the target first',
+	'scan.none.body':
+		'Download the calibration target, print it on film and expose a print. Then come back with its scan.',
+	'scan.none.action': 'Go to the target',
+	'scan.drop.title': 'Drop the scan here',
+	'scan.drop.or': 'or',
+	'scan.drop.choose': 'Choose a file',
+	'scan.drop.formats': 'TIFF or PNG at 16 bits per channel gives the finest measurements. JPEG works too.',
+	'scan.tips.title': 'Scanning',
+	'scan.tips.auto': 'Turn off auto contrast, colour correction and sharpening in the scanner software.',
+	'scan.tips.depth': 'Scan at 48 bits (16 per channel) if your scanner allows it.',
+	'scan.tips.resolution': '300 DPI is enough.',
+	'scan.tips.same': 'Always use the same scanner and settings.',
+	'scan.analyzing': 'Analysing {file}…',
+	'scan.result': 'Scan of the print with the detected marks and patches',
+	'scan.summary': '{file} · {width} × {height} px · {bits} bits',
+	'scan.summary.rotation': 'Rotated {degrees}°',
+	'scan.measured': '{count} patches measured',
+	'scan.outliers': '{count} with dust or scratches (weighted less)',
+	'scan.flatfield.apply': 'Correct the uneven exposure when measuring',
+	'scan.flatfield.hint':
+		'Removes the estimated gradient effect from each tone. Use it only if you cannot repeat the exposure.',
+	'scan.replace': 'Change scan',
+	'scan.next': 'Continue to curve',
+	'scan.next.soon': 'The Curve step arrives in the next version.',
+	'scan.saved': 'Measurements for print {print} saved.',
+	'scan.diag.MIRRORED':
+		'The print is mirrored relative to the target. This is normal if you exposed the film ink-side down and does not affect the measurement.',
+	'scan.diag.EIGHT_BIT_SCAN': '{bits}-bit scan: it works, but 16 bits per channel gives finer measurements.',
+	'scan.diag.LOW_SCAN_RESOLUTION':
+		'Patches are only {patchPixels} px in the scan (minimum {required}). Scan at a higher resolution.',
+	'scan.diag.UNEVEN_EXPOSURE':
+		'The exposure was uneven: up to {spanL} L* difference in mid-tones across the sheet. Check the UV source and the glass contact.',
+	'scan.diag.LAYOUT_MISMATCH':
+		"The measured tones do not follow this print's target. Is it the scan of another print or another project?",
+	'scan.error.title': 'The scan could not be read',
+	'scan.error.MARKERS_NOT_FOUND':
+		'{count} of the 4 registration marks are missing. Scan the whole sheet, uncropped, with all four corners visible.',
+	'scan.error.GEOMETRY_INCONSISTENT':
+		'The marks found do not form the expected sheet. Does this scan belong to this print?',
+	'scan.error.CORRUPT_FILE': 'The file is damaged or incomplete. Export it again from the scanner software.',
+	'scan.error.UNSUPPORTED_FORMAT': 'Unsupported format. Use TIFF, PNG or JPEG.',
+	'scan.error.UNSUPPORTED_BIT_DEPTH': 'Unsupported bit depth. Save it as an 8 or 16-bit TIFF or PNG.',
+	'scan.error.UNSUPPORTED_LAYOUT':
+		'This file variant is not supported. Save it as a standard 8 or 16-bit TIFF or PNG.',
+	'scan.error.UNKNOWN': 'Unexpected error while analysing the scan ({message}).',
 	'notfound.title': 'Project not found',
 	'notfound.body': 'It may have been deleted, or it is in another browser.'
 };

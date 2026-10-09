@@ -12,7 +12,7 @@ export interface StepInfo {
 export const STEPS: readonly StepInfo[] = [
 	{ id: 'project', label: 'steps.project', ready: true },
 	{ id: 'target', label: 'steps.target', ready: true },
-	{ id: 'scan', label: 'steps.scan', ready: false },
+	{ id: 'scan', label: 'steps.scan', ready: true },
 	{ id: 'curve', label: 'steps.curve', ready: false },
 	{ id: 'export', label: 'steps.export', ready: false }
 ];

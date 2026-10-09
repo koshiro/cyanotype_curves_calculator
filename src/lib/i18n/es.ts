@@ -90,7 +90,7 @@ export const es = {
 	'target.downloaded.new':
 		'Cambiaste las opciones después de escanear la impresión anterior: esta es la impresión {print}.',
 	'target.downloaded.next':
-		'Imprímelo, exponlo y deja secar la copia. El paso de escaneo llega en la próxima versión.',
+		'Imprímelo, exponlo y deja secar la copia. Después escanéala en el paso siguiente.',
 	'target.preview': 'Vista previa del negativo',
 	'target.preview.unavailable': 'Sin vista previa: corrige las opciones.',
 	'target.print.title': 'Para imprimir',
@@ -105,6 +105,60 @@ export const es = {
 		'La hoja es demasiado pequeña para las marcas de registro y los parches. Usa al menos {minWidth} × {minHeight} mm.',
 	'target.error.INVALID_OPTIONS': 'Revisa los valores: hay un dato fuera de rango.',
 
+	'scan.title': 'Escaneo de la copia',
+	'scan.lead':
+		'Escanea la copia ya seca, completa y sin recortar: las cuatro marcas de las esquinas deben verse.',
+	'scan.print': 'Impresión',
+	'scan.print.option': 'Impresión {print}',
+	'scan.none.title': 'Primero imprime el negativo',
+	'scan.none.body':
+		'Descarga el negativo de calibración, imprímelo y expón una copia. Después vuelve con su escaneo.',
+	'scan.none.action': 'Ir al negativo',
+	'scan.drop.title': 'Arrastra el escaneo aquí',
+	'scan.drop.or': 'o',
+	'scan.drop.choose': 'Elige un archivo',
+	'scan.drop.formats': 'TIFF o PNG de 16 bits por canal da las mediciones más finas. JPEG también sirve.',
+	'scan.tips.title': 'Para escanear',
+	'scan.tips.auto': 'Desactiva el autocontraste, la corrección de color y el enfoque del escáner.',
+	'scan.tips.depth': 'Escanea a 48 bits (16 por canal) si tu escáner lo permite.',
+	'scan.tips.resolution': 'Con 300 DPI basta.',
+	'scan.tips.same': 'Usa siempre el mismo escáner y los mismos ajustes.',
+	'scan.analyzing': 'Analizando {file}…',
+	'scan.result': 'Escaneo de la copia con las marcas y parches detectados',
+	'scan.summary': '{file} · {width} × {height} px · {bits} bits',
+	'scan.summary.rotation': 'Girado {degrees}°',
+	'scan.measured': '{count} parches medidos',
+	'scan.outliers': '{count} con polvo o rayas (pesan menos)',
+	'scan.flatfield.apply': 'Corregir la exposición despareja al medir',
+	'scan.flatfield.hint':
+		'Resta el efecto estimado del degradado en cada tono. Úsalo solo si no puedes repetir la exposición.',
+	'scan.replace': 'Cambiar escaneo',
+	'scan.next': 'Continuar a la curva',
+	'scan.next.soon': 'El paso Curva llega en la próxima versión.',
+	'scan.saved': 'Mediciones de la impresión {print} guardadas.',
+	'scan.diag.MIRRORED':
+		'La copia está espejada respecto del negativo. Es normal si expusiste el acetato con la tinta hacia el papel y no afecta la medición.',
+	'scan.diag.EIGHT_BIT_SCAN':
+		'Escaneo de {bits} bits: sirve, pero uno de 16 bits por canal da mediciones más finas.',
+	'scan.diag.LOW_SCAN_RESOLUTION':
+		'Los parches miden solo {patchPixels} px en el escaneo (mínimo {required}). Escanea a mayor resolución.',
+	'scan.diag.UNEVEN_EXPOSURE':
+		'La exposición no fue pareja: hasta {spanL} L* de diferencia en tonos medios entre zonas de la hoja. Revisa la fuente UV y el contacto del vidrio.',
+	'scan.diag.LAYOUT_MISMATCH':
+		'Los tonos medidos no siguen al negativo de esta impresión. ¿Es el escaneo de otra impresión o de otro proyecto?',
+	'scan.error.title': 'No se pudo leer el escaneo',
+	'scan.error.MARKERS_NOT_FOUND':
+		'Faltan {count} de las 4 marcas de registro. Escanea la hoja completa, sin recortar, con las cuatro esquinas visibles.',
+	'scan.error.GEOMETRY_INCONSISTENT':
+		'Las marcas encontradas no forman la hoja esperada. ¿Corresponde el escaneo a esta impresión?',
+	'scan.error.CORRUPT_FILE':
+		'El archivo está dañado o incompleto. Vuelve a exportarlo desde el programa del escáner.',
+	'scan.error.UNSUPPORTED_FORMAT': 'Formato no soportado. Usa TIFF, PNG o JPEG.',
+	'scan.error.UNSUPPORTED_BIT_DEPTH':
+		'Profundidad de color no soportada. Guárdalo como TIFF o PNG de 8 o 16 bits.',
+	'scan.error.UNSUPPORTED_LAYOUT':
+		'Esta variante del archivo no está soportada. Guárdalo como TIFF o PNG estándar de 8 o 16 bits.',
+	'scan.error.UNKNOWN': 'Error inesperado al analizar el escaneo ({message}).',
 	'notfound.title': 'No encontramos ese proyecto',
 	'notfound.body': 'Puede que se haya borrado o que esté en otro navegador.'
 } as const;

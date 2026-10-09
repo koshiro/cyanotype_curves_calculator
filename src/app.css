@@ -70,6 +70,14 @@
 	--focus-ring: light-dark(var(--prussian-500), var(--prussian-300));
 	/* Velo bajo dialogos modales. */
 	--scrim: oklch(0 0 0 / 0.45);
+	/*
+	 * Lineas superpuestas a escaneos: iguales en ambos temas porque van sobre la imagen.
+	 * Halo oscuro + linea clara, visibles sobre papel blanco y sobre azul de Prusia.
+	 */
+	--overlay-halo: oklch(0.16 0 0 / 0.55);
+	--overlay-line: var(--neutral-50);
+	--overlay-marker: var(--prussian-300);
+	--overlay-warning: var(--amber-300);
 	/* Fondo de lienzo para previsualizar imagenes: gris medio neutro, no sesga tonos. */
 	--surface-canvas: light-dark(var(--neutral-200), var(--neutral-800));
 

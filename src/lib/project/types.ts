@@ -23,7 +23,19 @@ export interface ScanRecord {
 	width: number;
 	height: number;
 	bitDepth: number;
+	dpi?: number;
+	/** Mediciones listas para calibrar (con campo plano corregido si se pidio). */
 	patches: MeasuredPatch[];
+	mirrored: boolean;
+	rotationDegrees: number;
+	flatFieldApplied: boolean;
+	/** Diferencia de L* entre extremos por exposicion despareja, si fue significativa. */
+	unevenExposureL: number | null;
+	diagnostics: { code: string; severity: string; params?: Record<string, number | string> }[];
+	/** Miniatura JPEG (data URL) y superposiciones en sus coordenadas, para volver a mostrarla. */
+	preview: { dataUrl: string; width: number; height: number };
+	overlays: { value: number; corners: [number, number][]; outlier: boolean }[];
+	markers: [number, number][][];
 }
 
 export interface Round {
