@@ -55,9 +55,15 @@
 	}
 
 	h2 {
+		display: -webkit-box;
 		margin: 0 0 var(--space-2);
+		overflow: hidden;
 		font-size: var(--text-xl);
 		line-height: var(--leading-tight);
+		-webkit-box-orient: vertical;
+		-webkit-line-clamp: 2;
+		line-clamp: 2;
+		overflow-wrap: anywhere;
 	}
 
 	p {

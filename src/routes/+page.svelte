@@ -72,15 +72,17 @@
 						<span class="meta">
 							{i18n.t('projects.updated', { date: i18n.date(project.updatedAt) })}
 							·
-							{project.rounds.length === 1
-								? i18n.t('projects.rounds.one')
-								: i18n.t('projects.rounds', { count: project.rounds.length })}
+							{project.rounds.length === 0
+								? i18n.t('projects.prints.none')
+								: project.rounds.length === 1
+									? i18n.t('projects.prints.one')
+									: i18n.t('projects.prints', { count: project.rounds.length })}
 						</span>
 						<ChevronRight class="chevron" size={20} aria-hidden="true" />
 					</a>
 					<button class="delete" type="button" onclick={() => askDelete(project)}>
 						<Trash size={18} aria-hidden="true" />
-						<span class="visually-hidden">{i18n.t('projects.delete')} {title(project)}</span>
+						<span class="visually-hidden">{i18n.t('projects.delete', { name: title(project) })}</span>
 					</button>
 				</li>
 			{/each}
@@ -114,7 +116,7 @@
 
 	h1 {
 		margin: 0;
-		font-size: var(--text-4xl);
+		font-size: var(--screen-title);
 		font-weight: var(--weight-semibold);
 		letter-spacing: -0.02em;
 	}
@@ -157,12 +159,12 @@
 		border-block-end: var(--border-width) solid var(--border-subtle);
 	}
 
+	/* El hover va a sangre, sin radio, igual que los divisores de la lista. */
 	.open {
 		position: relative;
 		display: grid;
 		gap: var(--space-1);
 		padding: var(--space-4) var(--space-8) var(--space-4) var(--space-2);
-		border-radius: var(--radius-md);
 		color: var(--text-primary);
 		text-decoration: none;
 		transition: background-color var(--duration-fast) var(--ease-standard);
@@ -218,10 +220,6 @@
 	@media (min-width: 48rem) {
 		.page {
 			padding: var(--space-16) var(--space-8) var(--space-24);
-		}
-
-		h1 {
-			font-size: var(--text-5xl);
 		}
 	}
 </style>

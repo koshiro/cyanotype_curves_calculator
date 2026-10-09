@@ -1,19 +1,13 @@
 <script lang="ts">
-	import { Monitor, Moon, Sun } from '@lucide/svelte';
-	import { i18n, type Locale } from '$lib/i18n/index.svelte';
-	import { theme, type ThemeChoice } from './theme.svelte';
-	import Segmented from './Segmented.svelte';
+	import { Languages, Monitor, Moon, Sun } from '@lucide/svelte';
+	import { i18n } from '$lib/i18n/index.svelte';
 	import { homeHref } from '$lib/routes';
+	import { theme, type ThemeChoice } from './theme.svelte';
 
-	const locales: { value: Locale; label: string }[] = [
-		{ value: 'es', label: 'ES' },
-		{ value: 'en', label: 'EN' }
-	];
+	const NEXT_THEME: Record<ThemeChoice, ThemeChoice> = { system: 'light', light: 'dark', dark: 'system' };
+	const ThemeIcon = $derived({ system: Monitor, light: Sun, dark: Moon }[theme.choice]);
+	const themeName = $derived(i18n.t(`settings.theme.${theme.choice}` as 'settings.theme.system'));
 </script>
-
-{#snippet sun()}<Sun size={16} aria-hidden="true" />{/snippet}
-{#snippet moon()}<Moon size={16} aria-hidden="true" />{/snippet}
-{#snippet monitor()}<Monitor size={16} aria-hidden="true" />{/snippet}
 
 <header class="header">
 	<a class="brand" href={homeHref()}>
@@ -24,47 +18,35 @@
 		<span>{i18n.t('app.name')}</span>
 	</a>
 	<div class="controls">
-		<Segmented
-			name="locale"
-			legend={i18n.t('settings.language')}
-			hideLegend
-			options={locales}
-			value={i18n.locale}
-			onchange={(value) => i18n.setLocale(value)}
-		/>
-		<Segmented
-			name="theme"
-			legend={i18n.t('settings.theme')}
-			hideLegend
-			options={[
-				{
-					value: 'system' as ThemeChoice,
-					label: i18n.t('settings.theme.system'),
-					hiddenLabel: true,
-					icon: monitor
-				},
-				{
-					value: 'light' as ThemeChoice,
-					label: i18n.t('settings.theme.light'),
-					hiddenLabel: true,
-					icon: sun
-				},
-				{ value: 'dark' as ThemeChoice, label: i18n.t('settings.theme.dark'), hiddenLabel: true, icon: moon }
-			]}
-			value={theme.choice}
-			onchange={(value) => theme.set(value)}
-		/>
+		<button
+			class="control"
+			type="button"
+			aria-label={i18n.t('settings.language.label')}
+			lang={i18n.locale === 'es' ? 'en' : 'es'}
+			onclick={() => i18n.setLocale(i18n.locale === 'es' ? 'en' : 'es')}
+		>
+			<Languages size={18} aria-hidden="true" />
+			<span class="wide-only">{i18n.t('settings.language.switch')}</span>
+		</button>
+		<button
+			class="control"
+			type="button"
+			aria-label={i18n.t('settings.theme.label', { theme: themeName })}
+			title={i18n.t('settings.theme.label', { theme: themeName })}
+			onclick={() => theme.set(NEXT_THEME[theme.choice])}
+		>
+			<ThemeIcon size={18} aria-hidden="true" />
+		</button>
 	</div>
 </header>
 
 <style>
 	.header {
 		display: flex;
-		flex-wrap: wrap;
 		align-items: center;
 		justify-content: space-between;
 		gap: var(--space-3);
-		padding: var(--space-3) var(--space-4);
+		padding: var(--space-2) var(--space-4);
 		border-block-end: var(--border-width) solid var(--border-subtle);
 	}
 
@@ -72,7 +54,7 @@
 		display: inline-flex;
 		align-items: center;
 		gap: var(--space-2);
-		min-height: var(--target-min);
+		min-height: var(--control-height);
 		color: var(--text-primary);
 		font-weight: var(--weight-semibold);
 		text-decoration: none;
@@ -96,8 +78,46 @@
 
 	.controls {
 		display: flex;
-		flex-wrap: wrap;
+		gap: var(--space-1);
+	}
+
+	.control {
+		display: inline-flex;
+		align-items: center;
 		gap: var(--space-2);
+		min-width: var(--control-height);
+		min-height: var(--control-height);
+		justify-content: center;
+		padding-inline: var(--space-2);
+		border: var(--border-width) solid transparent;
+		border-radius: var(--radius-md);
+		background: transparent;
+		color: var(--text-secondary);
+		font: inherit;
+		font-size: var(--text-sm);
+		cursor: pointer;
+		transition:
+			background-color var(--duration-fast) var(--ease-standard),
+			color var(--duration-fast) var(--ease-standard);
+	}
+
+	.control:hover {
+		background: var(--surface-sunken);
+		color: var(--text-primary);
+	}
+
+	.control:active {
+		transform: translateY(1px);
+	}
+
+	.wide-only {
+		display: none;
+	}
+
+	@media (min-width: 40rem) {
+		.wide-only {
+			display: inline;
+		}
 	}
 
 	@media (min-width: 48rem) {

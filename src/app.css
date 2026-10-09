@@ -34,11 +34,14 @@
 
 	--prussian-300: oklch(0.78 0.12 245);
 	--prussian-400: oklch(0.72 0.11 245);
+	--prussian-450: oklch(0.46 0.12 252);
 	--prussian-500: oklch(0.55 0.16 255);
+	--prussian-550: oklch(0.52 0.13 252);
 	--prussian-700: oklch(0.42 0.13 255);
 	--prussian-800: oklch(0.36 0.12 255);
 
 	--red-400: oklch(0.75 0.15 25);
+	--red-550: oklch(0.54 0.17 27);
 	--red-700: oklch(0.5 0.19 27);
 	--amber-300: oklch(0.83 0.13 80);
 	--amber-700: oklch(0.5 0.11 65);
@@ -57,12 +60,13 @@
 	--border-control: light-dark(var(--neutral-500), var(--neutral-500));
 
 	/* ---- Semanticos: acciones y foco ----------------------------------- */
-	--action-primary: light-dark(var(--prussian-700), var(--prussian-400));
-	--action-primary-hover: light-dark(var(--prussian-800), var(--prussian-300));
-	--action-primary-text: light-dark(var(--neutral-50), var(--neutral-950));
-	--action-destructive: light-dark(var(--red-700), var(--red-400));
-	--action-destructive-text: light-dark(var(--neutral-50), var(--neutral-950));
-	--text-link: var(--action-primary);
+	/* En oscuro el acento sigue siendo azul de Prusia denso con texto claro (no celeste). */
+	--action-primary: light-dark(var(--prussian-700), var(--prussian-550));
+	--action-primary-hover: light-dark(var(--prussian-800), var(--prussian-450));
+	--action-primary-text: var(--neutral-50);
+	--action-destructive: light-dark(var(--red-700), var(--red-550));
+	--action-destructive-text: var(--neutral-50);
+	--text-link: light-dark(var(--prussian-700), var(--prussian-300));
 	--focus-ring: light-dark(var(--prussian-500), var(--prussian-300));
 	/* Velo bajo dialogos modales. */
 	--scrim: oklch(0 0 0 / 0.45);
@@ -75,7 +79,7 @@
 	--feedback-success: light-dark(var(--green-700), var(--green-300));
 	--feedback-info: light-dark(var(--prussian-700), var(--prussian-400));
 
-	/* ---- Tipografia: escala Major Third (1.25), base 16px --------------- */
+	/* ---- Tipografia: escala de 9 pasos (razon ~1.2), base 16px ---------- */
 	--font-sans: system-ui, -apple-system, 'Segoe UI', Roboto, sans-serif;
 	--font-mono: ui-monospace, 'SF Mono', 'Cascadia Mono', monospace;
 	--text-xs: 0.75rem;
@@ -87,6 +91,8 @@
 	--text-3xl: 1.875rem;
 	--text-4xl: 2.25rem;
 	--text-5xl: 3rem;
+	/* Titulo de cada pantalla: un solo tamano y un solo punto de corte en toda la app. */
+	--screen-title: var(--text-3xl);
 	--leading-tight: 1.2;
 	--leading-normal: 1.55;
 	--measure: 65ch;
@@ -177,6 +183,12 @@ body {
 	clip: rect(0 0 0 0);
 	white-space: nowrap;
 	border: 0;
+}
+
+@media (min-width: 48rem) {
+	:root {
+		--screen-title: var(--text-4xl);
+	}
 }
 
 h1,

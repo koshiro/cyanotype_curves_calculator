@@ -39,3 +39,16 @@ export function sameTarget(a: TargetOptions, b: TargetOptions): boolean {
 	const keys: (keyof TargetOptions)[] = ['paper', 'customSizeMm', 'steps', 'patchSizeMm', 'dpi', 'seed'];
 	return keys.every((k) => JSON.stringify(a[k]) === JSON.stringify(b[k]));
 }
+
+/**
+ * Tamano minimo (mm, multiplos de 10) que admite las opciones actuales, manteniendo la
+ * proporcion de la hoja pedida. Para explicar SHEET_TOO_SMALL con un numero util.
+ */
+export function minimumSheet(options: TargetOptions): [number, number] | null {
+	const [w, h] = options.customSizeMm ?? [200, 250];
+	for (let scale = 1; scale <= 12; scale += 0.05) {
+		const size: [number, number] = [Math.ceil((w * scale) / 10) * 10, Math.ceil((h * scale) / 10) * 10];
+		if (tryLayout({ ...options, paper: 'custom', customSizeMm: size }).layout) return size;
+	}
+	return null;
+}

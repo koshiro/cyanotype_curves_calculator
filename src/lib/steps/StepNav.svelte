@@ -11,37 +11,35 @@
 
 	let { current, completed, hrefFor }: Props = $props();
 	const index = $derived(STEPS.findIndex((s) => s.id === current));
+	const ready = STEPS.filter((s) => s.ready);
+	const upcoming = $derived(
+		STEPS.filter((s) => !s.ready)
+			.map((s) => i18n.t(s.label))
+			.join(', ')
+	);
 </script>
 
 <nav class="steps" aria-label={i18n.t('steps.label')}>
 	<p class="progress">{i18n.t('steps.progress', { current: index + 1, total: STEPS.length })}</p>
 	<ol>
-		{#each STEPS as step, i (step.id)}
+		{#each ready as step (step.id)}
+			{@const number = STEPS.indexOf(step) + 1}
 			<li>
-				{#if step.ready}
-					<a
-						href={hrefFor(step.id)}
-						class="step"
-						class:current={step.id === current}
-						aria-current={step.id === current ? 'step' : undefined}
-					>
-						<span class="number" aria-hidden="true">
-							{#if completed.has(step.id) && step.id !== current}<Check size={14} />{:else}{i + 1}{/if}
-						</span>
-						<span class="label">{i18n.t(step.label)}</span>
-					</a>
-				{:else}
-					<span class="step unavailable" aria-disabled="true">
-						<span class="number" aria-hidden="true">{i + 1}</span>
-						<span class="label">
-							{i18n.t(step.label)}
-							<span class="soon">{i18n.t('common.soon')}</span>
-						</span>
+				<a
+					href={hrefFor(step.id)}
+					class="step"
+					class:current={step.id === current}
+					aria-current={step.id === current ? 'step' : undefined}
+				>
+					<span class="number" aria-hidden="true">
+						{#if completed.has(step.id) && step.id !== current}<Check size={14} />{:else}{number}{/if}
 					</span>
-				{/if}
+					<span>{i18n.t(step.label)}</span>
+				</a>
 			</li>
 		{/each}
 	</ol>
+	{#if upcoming}<p class="upcoming">{i18n.t('steps.upcoming', { steps: upcoming })}</p>{/if}
 </nav>
 
 <style>
@@ -50,7 +48,8 @@
 		gap: var(--space-2);
 	}
 
-	.progress {
+	.progress,
+	.upcoming {
 		margin: 0;
 		color: var(--text-secondary);
 		font-size: var(--text-sm);
@@ -78,14 +77,13 @@
 		transition: background-color var(--duration-fast) var(--ease-standard);
 	}
 
-	a.step:hover {
+	.step:hover {
 		background: var(--surface-sunken);
 		color: var(--text-primary);
 	}
 
 	.step.current {
-		background: var(--surface-raised);
-		box-shadow: 0 0 0 var(--border-width) var(--border-control);
+		background: var(--surface-sunken);
 		color: var(--text-primary);
 		font-weight: var(--weight-semibold);
 	}
@@ -107,25 +105,7 @@
 		color: var(--action-primary-text);
 	}
 
-	.unavailable {
-		cursor: not-allowed;
-		opacity: 0.6;
-	}
-
-	.label {
-		display: grid;
-	}
-
-	.soon {
-		font-size: var(--text-xs);
-		font-weight: var(--weight-regular);
-	}
-
 	@media (min-width: 64rem) {
-		.progress {
-			display: none;
-		}
-
 		ol {
 			flex-direction: column;
 			flex-wrap: nowrap;

@@ -1,5 +1,12 @@
 import { describe, expect, it } from 'vitest';
-import { DEFAULT_TARGET, largestFittingPatch, sameTarget, STEP_CHOICES, tryLayout } from './target-options';
+import {
+	DEFAULT_TARGET,
+	largestFittingPatch,
+	minimumSheet,
+	sameTarget,
+	STEP_CHOICES,
+	tryLayout
+} from './target-options';
 
 describe('opciones del target', () => {
 	it('el target por defecto cabe en carta', () => {
@@ -12,6 +19,17 @@ describe('opciones del target', () => {
 				expect(largestFittingPatch({ ...DEFAULT_TARGET, paper, steps }), `${paper} ${steps}`).not.toBeNull();
 			}
 		}
+	});
+
+	it('sugiere un tamano minimo cuando la hoja es demasiado chica', () => {
+		const options = {
+			...DEFAULT_TARGET,
+			paper: 'custom' as const,
+			customSizeMm: [60, 60] as [number, number]
+		};
+		const [w, h] = minimumSheet(options)!;
+		expect(w).toBeGreaterThan(60);
+		expect(tryLayout({ ...options, customSizeMm: [w, h] }).layout).not.toBeNull();
 	});
 
 	it('detecta cambios de opciones', () => {

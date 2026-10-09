@@ -1,4 +1,5 @@
 <script lang="ts">
+	import { beforeNavigate } from '$app/navigation';
 	import { page } from '$app/state';
 	import { ArrowLeft } from '@lucide/svelte';
 	import { i18n } from '$lib/i18n/index.svelte';
@@ -49,6 +50,16 @@
 	}
 
 	const hrefFor = (target: StepId) => projectHref(id, target);
+
+	/** Un proyecto recien creado y sin tocar no se guarda: se descarta al salir. */
+	function pristine(p: Project): boolean {
+		return !p.name.trim() && p.rounds.length === 0 && Object.values(p.process).every((v) => !v.trim());
+	}
+
+	beforeNavigate(({ to }) => {
+		const leaving = !to?.url.pathname.startsWith(`/p/${id}`);
+		if (leaving && project && pristine(project)) void projects.remove(project.id);
+	});
 </script>
 
 <div class="workspace">
@@ -62,10 +73,10 @@
 	{:else if project}
 		<div class="frame">
 			<aside class="rail">
-				<p class="project-name">{project.name.trim() || i18n.t('projects.untitled')}</p>
 				<StepNav current={step} {completed} {hrefFor} />
 			</aside>
 			<div class="content">
+				<p class="eyebrow">{project.name.trim() || i18n.t('projects.untitled')}</p>
 				{#if step === 'project'}
 					<ProjectStep bind:project onchange={scheduleSave} {saved} nextHref={hrefFor('target')} />
 				{:else if step === 'target'}
@@ -109,15 +120,25 @@
 		align-content: start;
 	}
 
-	.project-name {
+	.content {
+		display: grid;
+		gap: var(--space-2);
+		align-content: start;
+		min-width: 0;
+	}
+
+	/* El proyecto es el contexto del paso: va sobre el titulo, en tono secundario. */
+	.eyebrow {
 		margin: 0;
-		font-weight: var(--weight-semibold);
+		color: var(--text-secondary);
+		font-size: var(--text-sm);
+		font-weight: var(--weight-medium);
 		overflow-wrap: anywhere;
 	}
 
 	.missing h1 {
 		margin: 0 0 var(--space-2);
-		font-size: var(--text-3xl);
+		font-size: var(--screen-title);
 	}
 
 	.missing p {

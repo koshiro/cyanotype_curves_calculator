@@ -99,6 +99,15 @@ describe('buildTargetLayout', () => {
 		}
 	});
 
+	it('una hoja sin espacio entre las marcas da SHEET_TOO_SMALL, nunca una capacidad negativa', () => {
+		try {
+			buildTargetLayout({ paper: 'custom', customSizeMm: [60, 60], steps: 21 });
+			expect.unreachable();
+		} catch (error) {
+			expect((error as LayoutError).code).toBe('SHEET_TOO_SMALL');
+		}
+	});
+
 	it('256 pasos caben en carta con parches de 8 mm', () => {
 		expect(buildTargetLayout({ steps: 256, patchSizeMm: 8 }).patches).toHaveLength(268);
 	});

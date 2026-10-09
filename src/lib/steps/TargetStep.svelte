@@ -14,6 +14,7 @@
 		DEFAULT_TARGET,
 		DPI_CHOICES,
 		largestFittingPatch,
+		minimumSheet,
 		PATCH_SIZES_MM,
 		sameTarget,
 		STEP_CHOICES,
@@ -31,9 +32,12 @@
 	let customWidth = $state(200);
 	let customHeight = $state(250);
 	let busy = $state(false);
+	/** Aviso del ajuste automatico del parche (se borra al tocar el parche a mano). */
+	let adjusted = $state<{ size: number; steps: number } | null>(null);
+	let downloaded = $state<{ print: number; newPrint: boolean } | null>(null);
 	let canvas: HTMLCanvasElement | undefined = $state();
 
-	// Al abrir el paso se retoman las opciones de la ultima ronda, si existe.
+	// Al abrir el paso se retoman las opciones de la ultima impresion, si existe.
 	$effect.pre(() => {
 		const saved = project.rounds.at(-1)?.targetOptions;
 		if (saved) {
@@ -51,16 +55,43 @@
 	const references = $derived(
 		result.layout ? result.layout.patches.filter((p) => p.role === 'reference').length : 0
 	);
-	const paperLabel = $derived(i18n.t(`target.paper.${options.paper}` as 'target.paper.letter'));
+	const errorText = $derived.by(() => {
+		const error = result.error;
+		if (!error) return null;
+		if (error.code === 'SHEET_TOO_SMALL') {
+			const [minWidth, minHeight] = minimumSheet(effective) ?? [120, 150];
+			return i18n.t('target.error.SHEET_TOO_SMALL', { minWidth, minHeight });
+		}
+		return i18n.t(`target.error.${error.code}`, error.params);
+	});
+
+	function changed(next: TargetOptions) {
+		options = next;
+		downloaded = null;
+	}
+
+	/** Ajusta el parche solo si el actual no cabe: nunca cambia una eleccion que sigue siendo valida. */
+	function fitPatch(next: TargetOptions): TargetOptions {
+		const size = options.patchSizeMm ?? 12;
+		const candidate =
+			options.paper === 'custom' && next.paper === 'custom'
+				? { ...next, customSizeMm: effective.customSizeMm }
+				: next;
+		if (tryLayout({ ...candidate, patchSizeMm: size }).layout) {
+			adjusted = null;
+			return { ...next, patchSizeMm: size };
+		}
+		const fits = largestFittingPatch(candidate);
+		adjusted = fits !== null ? { size: fits, steps: next.steps ?? 51 } : null;
+		return { ...next, patchSizeMm: fits ?? size };
+	}
 
 	function chooseSteps(steps: number) {
-		const fits = largestFittingPatch({ ...effective, steps });
-		options = { ...options, steps, patchSizeMm: fits ?? options.patchSizeMm };
+		changed(fitPatch({ ...options, steps }));
 	}
 
 	function choosePaper(paper: PaperName) {
-		const fits = largestFittingPatch({ ...effective, paper });
-		options = { ...options, paper, patchSizeMm: fits ?? options.patchSizeMm };
+		changed(fitPatch({ ...options, paper }));
 	}
 
 	$effect(() => {
@@ -87,19 +118,22 @@
 		if (!layout) return;
 		busy = true;
 		try {
-			// Misma ronda mientras no tenga escaneo; si ya se escaneo, un cambio abre otra ronda.
+			// Misma impresion mientras no tenga escaneo; si ya se escaneo, un cambio abre otra.
 			const last = project.rounds.at(-1);
 			const targetOptions = $state.snapshot(effective);
+			let newPrint = false;
 			if (last && !last.scan) {
 				last.targetOptions = targetOptions;
 				last.layout = layout;
 			} else if (!last || !sameTarget(last.targetOptions, targetOptions)) {
 				project.rounds.push({ id: newId(), createdAt: new Date().toISOString(), targetOptions, layout });
+				newPrint = Boolean(last);
 			}
 			await onsave();
-			const round = project.rounds.length;
+			const print = project.rounds.length;
 			const png = encodeGrayPng(renderTarget(layout), layout.width, layout.height, layout.dpi);
-			downloadBytes(png, `cyano-target-${slug(project.name)}-r${round}.png`, 'image/png');
+			downloadBytes(png, `cyano-negativo-${slug(project.name)}-impresion-${print}.png`, 'image/png');
+			downloaded = { print, newPrint };
 		} finally {
 			busy = false;
 		}
@@ -116,12 +150,23 @@
 
 	<div class="layout">
 		<figure class="preview" aria-label={i18n.t('target.preview')}>
-			<canvas bind:this={canvas} aria-hidden="true"></canvas>
 			{#if result.layout}
+				<canvas
+					bind:this={canvas}
+					aria-hidden="true"
+					style:--ratio={result.layout.width / result.layout.height}
+				></canvas>
 				<figcaption>
-					{i18n.t('target.summary', { steps: options.steps ?? 0, references, paper: paperLabel })}
-					· {result.layout.width} × {result.layout.height} px
+					{i18n.t('target.summary', {
+						steps: options.steps ?? 0,
+						references,
+						paper: i18n.t(`target.paper.${options.paper ?? 'letter'}` as 'target.paper.letter'),
+						width: result.layout.width,
+						height: result.layout.height
+					})}
 				</figcaption>
+			{:else}
+				<p class="unavailable">{i18n.t('target.preview.unavailable')}</p>
 			{/if}
 		</figure>
 
@@ -146,6 +191,7 @@
 						max={600}
 						label={i18n.t('target.width')}
 						bind:value={customWidth}
+						oninput={() => (downloaded = null)}
 					/>
 					<TextField
 						id="custom-height"
@@ -154,6 +200,7 @@
 						max={600}
 						label={i18n.t('target.height')}
 						bind:value={customHeight}
+						oninput={() => (downloaded = null)}
 					/>
 				</div>
 			{/if}
@@ -169,26 +216,34 @@
 				<p class="hint">{i18n.t('target.steps.hint')}</p>
 			</div>
 
-			<Segmented
-				name="patch"
-				legend={i18n.t('target.patch')}
-				options={PATCH_SIZES_MM.map((value) => ({ value, label: String(value) }))}
-				value={options.patchSizeMm ?? 12}
-				onchange={(value) => (options = { ...options, patchSizeMm: value })}
-			/>
+			<div class="group">
+				<Segmented
+					name="patch"
+					legend={i18n.t('target.patch')}
+					options={[...PATCH_SIZES_MM]
+						.sort((a, b) => a - b)
+						.map((value) => ({ value, label: String(value) }))}
+					value={options.patchSizeMm ?? 12}
+					onchange={(value) => {
+						adjusted = null;
+						changed({ ...options, patchSizeMm: value });
+					}}
+				/>
+				{#if adjusted}
+					<p class="hint" aria-live="polite">{i18n.t('target.patch.adjusted', adjusted)}</p>
+				{/if}
+			</div>
 
 			<Segmented
 				name="dpi"
 				legend={i18n.t('target.dpi')}
 				options={DPI_CHOICES.map((value) => ({ value, label: String(value) }))}
 				value={options.dpi ?? 300}
-				onchange={(value) => (options = { ...options, dpi: value })}
+				onchange={(value) => changed({ ...options, dpi: value })}
 			/>
 
-			{#if result.error}
-				<Notice tone="error">
-					{i18n.t(`target.error.${result.error.code}`, result.error.params)}
-				</Notice>
+			{#if errorText}
+				<Notice tone="error">{errorText}</Notice>
 			{/if}
 
 			<Button
@@ -200,6 +255,13 @@
 			>
 				{i18n.t('target.download')}
 			</Button>
+
+			{#if downloaded}
+				<Notice tone="success" title={i18n.t('target.downloaded', { print: downloaded.print })}>
+					{#if downloaded.newPrint}<p>{i18n.t('target.downloaded.new', { print: downloaded.print })}</p>{/if}
+					<p>{i18n.t('target.downloaded.next')}</p>
+				</Notice>
+			{/if}
 
 			<div class="print">
 				<h2><Printer size={18} aria-hidden="true" /> {i18n.t('target.print.title')}</h2>
@@ -222,7 +284,7 @@
 
 	h1 {
 		margin: 0 0 var(--space-2);
-		font-size: var(--text-3xl);
+		font-size: var(--screen-title);
 	}
 
 	.lead {
@@ -239,26 +301,45 @@
 
 	.preview {
 		display: grid;
-		gap: var(--space-2);
+		justify-items: center;
+		gap: var(--space-3);
 		margin: 0;
 		padding: var(--space-4);
 		border-radius: var(--radius-lg);
 		background: var(--surface-canvas);
 	}
 
+	/*
+	 * El marco abraza la hoja: el ancho es el menor entre el disponible y el que corresponde al
+	 * alto maximo segun la proporcion; el alto sale de la proporcion. Nunca se deforma.
+	 */
 	canvas {
+		--preview-height: 40vh;
 		display: block;
-		width: 100%;
+		width: min(100%, calc(var(--preview-height) * var(--ratio)));
 		height: auto;
-		max-height: 75vh;
-		object-fit: contain;
+		aspect-ratio: var(--ratio);
 		box-shadow: 0 0 0 var(--border-width) var(--border-subtle);
 	}
 
 	figcaption {
+		justify-self: start;
 		color: var(--text-secondary);
 		font-size: var(--text-sm);
 		font-variant-numeric: tabular-nums;
+	}
+
+	.unavailable {
+		display: grid;
+		place-items: center;
+		width: 100%;
+		min-height: 30vh;
+		margin: 0;
+		border: var(--border-width) dashed var(--border-control);
+		border-radius: var(--radius-md);
+		color: var(--text-secondary);
+		text-align: center;
+		padding: var(--space-6);
 	}
 
 	.controls {
@@ -312,12 +393,18 @@
 	}
 
 	@media (min-width: 64rem) {
-		h1 {
-			font-size: var(--text-4xl);
-		}
-
 		.layout {
 			grid-template-columns: minmax(0, 3fr) minmax(18rem, 2fr);
+		}
+
+		/* En escritorio la vista previa acompana a los controles mientras se desplazan. */
+		.preview {
+			position: sticky;
+			inset-block-start: var(--space-6);
+		}
+
+		canvas {
+			--preview-height: 72vh;
 		}
 	}
 </style>

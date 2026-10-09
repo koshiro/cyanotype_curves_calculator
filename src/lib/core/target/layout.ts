@@ -79,7 +79,7 @@ export interface TargetOptions {
 
 export class LayoutError extends Error {
 	constructor(
-		readonly code: 'DOES_NOT_FIT' | 'INVALID_OPTIONS',
+		readonly code: 'DOES_NOT_FIT' | 'SHEET_TOO_SMALL' | 'INVALID_OPTIONS',
 		readonly params: Record<string, number | string> = {}
 	) {
 		super(`${code} ${JSON.stringify(params)}`);
@@ -174,7 +174,9 @@ export function buildTargetLayout(options: TargetOptions = {}): TargetLayout {
 			Array.from({ length: replicates }, () => ({ value: Math.round(value), role: 'reference' as const }))
 		)
 	];
-	const capacity = columns * rows;
+	const capacity = Math.max(columns, 0) * Math.max(rows, 0);
+	// Sin espacio ni para una fila entre las marcas: el problema es la hoja, no los pasos.
+	if (capacity === 0) throw new LayoutError('SHEET_TOO_SMALL', { widthMm, heightMm });
 	if (entries.length > capacity) {
 		throw new LayoutError('DOES_NOT_FIT', { required: entries.length, capacity });
 	}

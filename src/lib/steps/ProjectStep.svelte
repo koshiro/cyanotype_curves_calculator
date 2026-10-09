@@ -1,6 +1,6 @@
 <script lang="ts">
-	import { i18n } from '$lib/i18n/index.svelte';
-	import type { Project } from '$lib/project/types';
+	import { i18n, type MessageKey } from '$lib/i18n/index.svelte';
+	import type { ProcessInfo, Project } from '$lib/project/types';
 	import Button from '$lib/ui/Button.svelte';
 	import TextField from '$lib/ui/TextField.svelte';
 
@@ -12,7 +12,14 @@
 	}
 
 	let { project = $bindable(), onchange, saved, nextHref }: Props = $props();
-	const optional = $derived(i18n.t('common.optional'));
+
+	const fields: { key: keyof ProcessInfo; label: MessageKey; placeholder: MessageKey; wide?: boolean }[] = [
+		{ key: 'paper', label: 'project.paper', placeholder: 'project.paper.placeholder' },
+		{ key: 'chemistry', label: 'project.chemistry', placeholder: 'project.chemistry.placeholder' },
+		{ key: 'printer', label: 'project.printer', placeholder: 'project.printer.placeholder' },
+		{ key: 'film', label: 'project.film', placeholder: 'project.film.placeholder' },
+		{ key: 'exposure', label: 'project.exposure', placeholder: 'project.exposure.placeholder', wide: true }
+	];
 </script>
 
 <section class="step" aria-labelledby="project-title">
@@ -27,52 +34,27 @@
 				id="name"
 				label={i18n.t('project.name')}
 				placeholder={i18n.t('project.name.placeholder')}
+				hint={i18n.t('project.hint')}
 				bind:value={project.name}
 				oninput={onchange}
 			/>
 		</div>
-		<TextField
-			id="paper"
-			label={i18n.t('project.paper')}
-			optionalLabel={optional}
-			bind:value={project.process.paper}
-			oninput={onchange}
-		/>
-		<TextField
-			id="chemistry"
-			label={i18n.t('project.chemistry')}
-			placeholder={i18n.t('project.chemistry.placeholder')}
-			optionalLabel={optional}
-			bind:value={project.process.chemistry}
-			oninput={onchange}
-		/>
-		<TextField
-			id="printer"
-			label={i18n.t('project.printer')}
-			optionalLabel={optional}
-			bind:value={project.process.printer}
-			oninput={onchange}
-		/>
-		<TextField
-			id="film"
-			label={i18n.t('project.film')}
-			optionalLabel={optional}
-			bind:value={project.process.film}
-			oninput={onchange}
-		/>
-		<TextField
-			id="exposure"
-			label={i18n.t('project.exposure')}
-			placeholder={i18n.t('project.exposure.placeholder')}
-			optionalLabel={optional}
-			bind:value={project.process.exposure}
-			oninput={onchange}
-		/>
+		{#each fields as field (field.key)}
+			<div class:wide={field.wide}>
+				<TextField
+					id={field.key}
+					label={i18n.t(field.label)}
+					placeholder={i18n.t(field.placeholder)}
+					bind:value={project.process[field.key]}
+					oninput={onchange}
+				/>
+			</div>
+		{/each}
 		<div class="wide">
 			<TextField
 				id="notes"
 				label={i18n.t('project.notes')}
-				optionalLabel={optional}
+				placeholder={i18n.t('project.notes.placeholder')}
 				multiline
 				bind:value={project.process.notes}
 				oninput={onchange}
@@ -94,7 +76,7 @@
 
 	h1 {
 		margin: 0 0 var(--space-2);
-		font-size: var(--text-3xl);
+		font-size: var(--screen-title);
 	}
 
 	.lead {
@@ -129,12 +111,6 @@
 
 		.wide {
 			grid-column: 1 / -1;
-		}
-	}
-
-	@media (min-width: 48rem) {
-		h1 {
-			font-size: var(--text-4xl);
 		}
 	}
 </style>

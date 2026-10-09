@@ -1,6 +1,9 @@
 /**
  * Textos en espanol (idioma de referencia). `en.ts` debe tener exactamente las mismas claves:
  * el tipo `Messages` lo exige en compilacion.
+ *
+ * Vocabulario fijo: "negativo de calibracion" (lo que se imprime en acetato), "impresion"
+ * (cada vez que se imprime y expone uno, antes llamada ronda), "copia" (el cianotipo resultante).
  * Sin rayas largas ni relleno: cada texto dice la cosa concreta.
  */
 export const es = {
@@ -9,26 +12,28 @@ export const es = {
 	'app.skip': 'Ir al contenido',
 	'app.privacy': 'Todo ocurre en tu navegador. Tus escaneos no salen de tu equipo.',
 
-	'settings.language': 'Idioma',
-	'settings.theme': 'Tema',
-	'settings.theme.system': 'Sistema',
-	'settings.theme.light': 'Claro',
-	'settings.theme.dark': 'Oscuro',
+	'settings.language.switch': 'English',
+	'settings.language.label': 'Cambiar idioma a inglés',
+	'settings.theme.label': 'Tema: {theme}. Cambiar tema',
+	'settings.theme.system': 'según el sistema',
+	'settings.theme.light': 'claro',
+	'settings.theme.dark': 'oscuro',
 
 	'projects.title': 'Proyectos',
 	'projects.lead':
 		'Cada proyecto es una combinación de papel, química, impresora y acetato. Calibra una vez por combinación.',
 	'projects.new': 'Nuevo proyecto',
 	'projects.empty.title': 'Aún no tienes proyectos',
-	'projects.empty.body': 'Crea uno para generar tu primer target de calibración.',
+	'projects.empty.body': 'Crea uno para generar tu primer negativo de calibración.',
 	'projects.updated': 'Actualizado {date}',
-	'projects.rounds': '{count} rondas',
-	'projects.rounds.one': '1 ronda',
+	'projects.prints': '{count} impresiones',
+	'projects.prints.one': '1 impresión',
+	'projects.prints.none': 'Sin negativo aún',
 	'projects.open': 'Abrir {name}',
-	'projects.delete': 'Eliminar',
-	'projects.delete.title': 'Eliminar {name}',
+	'projects.delete': 'Eliminar {name}',
+	'projects.delete.title': '¿Eliminar «{name}»?',
 	'projects.delete.body':
-		'Se borran sus targets, mediciones y curvas de este navegador. No se puede deshacer.',
+		'Se borran sus negativos, mediciones y curvas de este navegador. No se puede deshacer.',
 	'projects.delete.confirm': 'Eliminar proyecto',
 	'projects.untitled': 'Proyecto sin nombre',
 	'projects.storage.unavailable':
@@ -36,35 +41,38 @@ export const es = {
 
 	'common.cancel': 'Cancelar',
 	'common.back': 'Proyectos',
-	'common.save': 'Guardar',
 	'common.saved': 'Guardado',
-	'common.optional': 'opcional',
-	'common.soon': 'En construcción',
 
 	'steps.label': 'Pasos de la calibración',
-	'steps.project': 'Proyecto',
-	'steps.target': 'Target',
+	'steps.project': 'Proceso',
+	'steps.target': 'Negativo',
 	'steps.scan': 'Escaneo',
 	'steps.curve': 'Curva',
 	'steps.export': 'Exportar',
 	'steps.progress': 'Paso {current} de {total}',
+	'steps.upcoming': 'Próximos pasos: {steps} (en construcción)',
 
 	'project.title': 'Datos del proceso',
 	'project.lead': 'Anota lo que define este proceso. Si cambias algo de esto, la curva deja de valer.',
-	'project.name': 'Nombre',
+	'project.name': 'Nombre del proyecto',
 	'project.name.placeholder': 'Ej.: Arches Platine, fórmula clásica, Epson P900',
 	'project.paper': 'Papel',
+	'project.paper.placeholder': 'Ej.: Arches Platine 310 g',
 	'project.chemistry': 'Química',
 	'project.chemistry.placeholder': 'Ej.: clásica A+B 1:1',
 	'project.printer': 'Impresora y tintas',
+	'project.printer.placeholder': 'Ej.: Epson P900, tintas originales',
 	'project.film': 'Acetato',
+	'project.film.placeholder': 'Ej.: Pictorico OHP',
 	'project.exposure': 'Exposición',
 	'project.exposure.placeholder': 'Ej.: caja UV LED, 12 min',
 	'project.notes': 'Notas',
-	'project.next': 'Continuar al target',
+	'project.notes.placeholder': 'Lo que quieras recordar de este proceso',
+	'project.hint': 'Solo el nombre es necesario. El resto te ayuda a reconocer el proceso más adelante.',
+	'project.next': 'Continuar al negativo',
 
-	'target.title': 'Target de calibración',
-	'target.lead': 'Imprime este negativo en acetato tal como se descarga y exponlo con tu proceso habitual.',
+	'target.title': 'Negativo de calibración',
+	'target.lead': 'Imprímelo en acetato tal como se descarga y exponlo con tu proceso habitual.',
 	'target.paper': 'Tamaño de hoja',
 	'target.paper.letter': 'Carta',
 	'target.paper.a4': 'A4',
@@ -72,20 +80,29 @@ export const es = {
 	'target.width': 'Ancho (mm)',
 	'target.height': 'Alto (mm)',
 	'target.steps': 'Pasos de tono',
-	'target.steps.hint': 'Más pasos dan una curva más fina, pero exigen parches más chicos.',
+	'target.steps.hint': 'Más pasos dan una curva más fina, pero exigen parches más pequeños.',
 	'target.patch': 'Lado del parche (mm)',
+	'target.patch.adjusted': 'Ajustado a {size} mm para que quepan {steps} pasos.',
 	'target.dpi': 'Resolución de la imagen (DPI)',
-	'target.summary': '{steps} pasos y {references} parches de referencia en {paper}',
+	'target.summary': '{steps} pasos · {references} parches de referencia · {paper} · {width} × {height} px',
 	'target.download': 'Descargar negativo (PNG)',
+	'target.downloaded': 'Negativo de la impresión {print} descargado.',
+	'target.downloaded.new':
+		'Cambiaste las opciones después de escanear la impresión anterior: esta es la impresión {print}.',
+	'target.downloaded.next':
+		'Imprímelo, exponlo y deja secar la copia. El paso de escaneo llega en la próxima versión.',
 	'target.preview': 'Vista previa del negativo',
+	'target.preview.unavailable': 'Sin vista previa: corrige las opciones.',
 	'target.print.title': 'Para imprimir',
-	'target.print.scale': 'Imprime al 100 %, sin ajustar a la página.',
+	'target.print.scale': 'Imprime al 100 %, sin ajustar a la página.',
 	'target.print.color':
 		'Desactiva la gestión de color del driver o usa el mismo perfil que usarás con tus fotos.',
 	'target.print.same': 'Usa el mismo acetato, tintas y ajustes que para tus negativos reales.',
-	'target.print.keep': 'Este target queda guardado en el proyecto: lo necesitas para leer el escaneo.',
+	'target.print.keep': 'El negativo queda guardado en el proyecto: lo necesitas para leer el escaneo.',
 	'target.error.DOES_NOT_FIT':
 		'No caben {required} parches en esta hoja (hay espacio para {capacity}). Reduce los pasos o el lado del parche.',
+	'target.error.SHEET_TOO_SMALL':
+		'La hoja es demasiado pequeña para las marcas de registro y los parches. Usa al menos {minWidth} × {minHeight} mm.',
 	'target.error.INVALID_OPTIONS': 'Revisa los valores: hay un dato fuera de rango.',
 
 	'notfound.title': 'No encontramos ese proyecto',
