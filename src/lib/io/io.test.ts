@@ -6,6 +6,7 @@ import { renderTarget } from '../core/target/render';
 import { decodeImage, fromRgba, sniffImage } from './decode';
 import { ImageFormatError } from './errors';
 import { encodeGrayPng } from './png';
+import { encodeGray16Tiff } from './tiff-write';
 
 /** TIFF minimo sin comprimir para tests (gris, RGB o RGBA; 8 o 16 bits). */
 function makeTiff(options: {
@@ -274,5 +275,23 @@ describe('formatos', () => {
 	it('fromRgba descarta el alfa', () => {
 		const image = fromRgba(1, 1, [255, 128, 0, 10]);
 		expect(Array.from(image.data, (v) => Math.round(v * 255))).toEqual([255, 128, 0]);
+	});
+});
+
+describe('negativo de 16 bits', () => {
+	const pixels = Uint16Array.from({ length: 6 * 4 }, (_, i) => i * 2700 + 17);
+
+	it('PNG de 16 bits con DPI se vuelve a leer exacto', () => {
+		const image = decodeImage(encodeGrayPng(pixels, 6, 4, 360));
+		expect(image).toMatchObject({ width: 6, height: 4, channels: 1, bitDepth: 16, dpi: 360 });
+		expect(Array.from(image.data, (v) => Math.round(v * 65535))).toEqual(Array.from(pixels));
+	});
+
+	it('TIFF de 16 bits con DPI se vuelve a leer exacto', () => {
+		const tiff = encodeGray16Tiff(pixels, 6, 4, 720);
+		expect(sniffImage(tiff)).toBe('tiff');
+		const image = decodeImage(tiff);
+		expect(image).toMatchObject({ width: 6, height: 4, channels: 1, bitDepth: 16, dpi: 720 });
+		expect(Array.from(image.data, (v) => Math.round(v * 65535))).toEqual(Array.from(pixels));
 	});
 });

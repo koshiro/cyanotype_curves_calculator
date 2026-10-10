@@ -11,6 +11,7 @@
 	import ScanStep from '$lib/steps/ScanStep.svelte';
 	import CurveStep from '$lib/steps/CurveStep.svelte';
 	import ExportStep from '$lib/steps/ExportStep.svelte';
+	import PhotoStep from '$lib/steps/PhotoStep.svelte';
 	import { isStepId, type StepId } from '$lib/steps/steps';
 	import { homeHref, projectHref } from '$lib/routes';
 
@@ -99,7 +100,9 @@
 				{:else if step === 'curve'}
 					<CurveStep bind:project onsave={save} scanHref={hrefFor('scan')} exportHref={hrefFor('export')} />
 				{:else if step === 'export'}
-					<ExportStep {project} curveHref={hrefFor('curve')} />
+					<ExportStep {project} curveHref={hrefFor('curve')} photoHref={hrefFor('photo')} />
+				{:else if step === 'photo'}
+					<PhotoStep {project} curveHref={hrefFor('curve')} />
 				{/if}
 			</div>
 		</div>

@@ -9,6 +9,11 @@
 			content="Calibrador de curvas para negativos digitales de cianotipo. Funciona en tu navegador: tus escaneos no salen de tu equipo."
 		/>
 		<link rel="icon" href="%sveltekit.assets%/favicon.svg" type="image/svg+xml" />
+		<link rel="manifest" href="%sveltekit.assets%/manifest.webmanifest" />
+		<link rel="apple-touch-icon" href="%sveltekit.assets%/icons/apple-touch-icon.png" />
+		<!-- Las meta no leen variables CSS: valores de --surface-page claro y oscuro. -->
+		<meta name="theme-color" content="#fafafa" media="(prefers-color-scheme: light)" /><!-- ds-allow-hardcode -->
+		<meta name="theme-color" content="#161616" media="(prefers-color-scheme: dark)" /><!-- ds-allow-hardcode -->
 		<title>Cyano Curve</title>
 		%sveltekit.head%
 	</head>

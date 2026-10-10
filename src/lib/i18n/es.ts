@@ -49,6 +49,7 @@ export const es = {
 	'steps.scan': 'Escaneo',
 	'steps.curve': 'Curva',
 	'steps.export': 'Exportar',
+	'steps.photo': 'Foto',
 	'steps.progress': 'Paso {current} de {total}',
 	'steps.upcoming': 'Próximos pasos: {steps}',
 
@@ -278,6 +279,27 @@ export const es = {
 	'projects.import.error.NOT_A_PROJECT': 'El archivo no es un proyecto de Cyano Curve.',
 	'projects.import.error.UNSUPPORTED_VERSION':
 		'Este proyecto es de una versión ({version}) que esta app no conoce.',
+	'photo.title': 'Negativo de una foto',
+	'photo.lead': 'Aplica la curva a tu foto y descarga el negativo listo para imprimir en acetato.',
+	'photo.drop.title': 'Arrastra tu foto aquí',
+	'photo.drop.choose': 'Elige una foto',
+	'photo.drop.formats':
+		'TIFF o PNG de 16 bits conserva mejor los tonos. JPEG también sirve. Las fotos en color se convierten a gris.',
+	'photo.mirror': 'Espejar el negativo',
+	'photo.mirror.hint':
+		'Actívalo si expones con la tinta del acetato contra el papel (lo habitual): así la copia se lee al derecho.',
+	'photo.dpi': 'Resolución del archivo (DPI)',
+	'photo.dpi.original': 'Original',
+	'photo.format': 'Formato',
+	'photo.processing': 'Generando el negativo…',
+	'photo.positive': 'Foto',
+	'photo.negative': 'Negativo para imprimir',
+	'photo.size': '{width} × {height} px · {dpi} DPI · {widthCm} × {heightCm} cm impreso',
+	'photo.download': 'Descargar negativo',
+	'photo.change': 'Cambiar foto',
+	'photo.method': 'Con la curva del método {method}',
+	'photo.error.title': 'No se pudo generar el negativo',
+	'photo.error.UNKNOWN': 'Error inesperado al generar el negativo. Prueba guardando la foto como TIFF o PNG.',
 	'notfound.title': 'No encontramos ese proyecto',
 	'notfound.body': 'Puede que se haya borrado o que esté en otro navegador.'
 } as const;

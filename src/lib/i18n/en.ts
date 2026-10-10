@@ -43,6 +43,7 @@ export const en: Messages = {
 	'steps.scan': 'Scan',
 	'steps.curve': 'Curve',
 	'steps.export': 'Export',
+	'steps.photo': 'Photo',
 	'steps.progress': 'Step {current} of {total}',
 	'steps.upcoming': 'Next steps: {steps}',
 
@@ -266,6 +267,28 @@ export const en: Messages = {
 	'projects.import.error.NOT_A_PROJECT': 'The file is not a Cyano Curve project.',
 	'projects.import.error.UNSUPPORTED_VERSION':
 		'This project is from a version ({version}) this app does not know.',
+	'photo.title': 'Negative from a photo',
+	'photo.lead': 'Apply the curve to your photo and download the negative ready to print on film.',
+	'photo.drop.title': 'Drop your photo here',
+	'photo.drop.choose': 'Choose a photo',
+	'photo.drop.formats':
+		'TIFF or PNG at 16 bits keeps tones best. JPEG works too. Colour photos are converted to grey.',
+	'photo.mirror': 'Mirror the negative',
+	'photo.mirror.hint':
+		'Turn it on if you expose with the film ink facing the paper (the usual way), so the print reads correctly.',
+	'photo.dpi': 'File resolution (DPI)',
+	'photo.dpi.original': 'Original',
+	'photo.format': 'Format',
+	'photo.processing': 'Generating the negative…',
+	'photo.positive': 'Photo',
+	'photo.negative': 'Negative to print',
+	'photo.size': '{width} × {height} px · {dpi} DPI · {widthCm} × {heightCm} cm printed',
+	'photo.download': 'Download negative',
+	'photo.change': 'Change photo',
+	'photo.method': 'Using the {method} curve',
+	'photo.error.title': 'The negative could not be generated',
+	'photo.error.UNKNOWN':
+		'Unexpected error while generating the negative. Try saving the photo as TIFF or PNG.',
 	'notfound.title': 'Project not found',
 	'notfound.body': 'It may have been deleted, or it is in another browser.'
 };
