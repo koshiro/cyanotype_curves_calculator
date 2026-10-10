@@ -44,3 +44,6 @@ Thumbs.db
 # Claude Code (configuracion personal)
 .claude/settings.local.json
 .claude/worktrees/
+
+# El gitignore global excluye docs/; aqui se versiona.
+!docs/
