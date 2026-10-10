@@ -4,6 +4,7 @@
 	import { ArrowLeft } from '@lucide/svelte';
 	import { i18n } from '$lib/i18n/index.svelte';
 	import { projects } from '$lib/project/store.svelte';
+	import { discardOnLeave } from '$lib/project/discard';
 	import type { Project } from '$lib/project/types';
 	import ProjectStep from '$lib/steps/ProjectStep.svelte';
 	import StepNav from '$lib/steps/StepNav.svelte';
@@ -65,14 +66,10 @@
 
 	const hrefFor = (target: StepId) => projectHref(id, target);
 
-	/** Un proyecto recien creado y sin tocar no se guarda: se descarta al salir. */
-	function pristine(p: Project): boolean {
-		return !p.name.trim() && p.rounds.length === 0 && Object.values(p.process).every((v) => !v.trim());
-	}
-
-	beforeNavigate(({ to }) => {
-		const leaving = !to?.url.pathname.startsWith(`/p/${id}`);
-		if (leaving && project && pristine(project)) void projects.remove(project.id);
+	/** Un proyecto recien creado y sin tocar se descarta al volver a la lista; al recargar se conserva. */
+	beforeNavigate(({ type, to }) => {
+		if (project && discardOnLeave(project, id, { type, toPath: to?.url.pathname ?? null }))
+			void projects.remove(project.id);
 	});
 </script>
 
