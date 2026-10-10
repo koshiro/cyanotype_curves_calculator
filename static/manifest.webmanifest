@@ -1,0 +1,18 @@
+{
+	"name": "Cyano Curve",
+	"short_name": "Cyano Curve",
+	"description": "Curvas para negativos digitales de cianotipo. Funciona sin conexión; tus escaneos no salen de tu equipo.",
+	"lang": "es",
+	"start_url": "/",
+	"scope": "/",
+	"display": "standalone",
+	"background_color": "#fafafa",
+	"theme_color": "#0b4c92",
+	"categories": ["photo", "utilities"],
+	"icons": [
+		{ "src": "/icons/icon-192.png", "sizes": "192x192", "type": "image/png", "purpose": "any" },
+		{ "src": "/icons/icon-512.png", "sizes": "512x512", "type": "image/png", "purpose": "any" },
+		{ "src": "/icons/maskable-512.png", "sizes": "512x512", "type": "image/png", "purpose": "maskable" },
+		{ "src": "/favicon.svg", "sizes": "any", "type": "image/svg+xml", "purpose": "any" }
+	]
+}

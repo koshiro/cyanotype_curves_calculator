@@ -8,7 +8,7 @@ las curvas nunca salen del equipo de quien lo usa.
 
 ## Qué hace
 
-El flujo tiene cinco pasos, cada uno guardado en un proyecto del navegador (IndexedDB):
+El flujo tiene seis pasos, cada uno guardado en un proyecto del navegador (IndexedDB):
 
 1. **Proceso**: papel, química, impresora, acetato y exposición. Si algo cambia, la curva deja de valer.
 2. **Negativo de calibración**: hoja carta, A4 o personalizada, 21 a 256 pasos de tono, parches en orden aleatorio,
@@ -22,6 +22,10 @@ El flujo tiene cinco pasos, cada uno guardado en un proyecto del navegador (Inde
    rondas se combinan.
 5. **Exportar**: Photoshop (`.amp` exacto o `.acv` editable), GIMP (`.settings`), LUT `.cube` (también con la
    inversión incluida) y el proyecto completo en JSON para respaldarlo o moverlo a otro navegador.
+6. **Foto**: aplica la curva a una foto (TIFF, PNG o JPEG), la invierte y la espeja, y entrega el negativo en TIFF o
+   PNG de 16 bits en escala de grises con el DPI elegido.
+
+Se instala como app (PWA) y funciona sin conexión: un service worker guarda la aplicación al primer uso.
 
 La interfaz está en español e inglés, con tema claro y oscuro, y cumple WCAG 2.2 AA: el contraste de cada pareja de
 colores se mide en CI.

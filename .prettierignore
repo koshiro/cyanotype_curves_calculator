@@ -6,3 +6,6 @@ package-lock.json
 docs/
 .venv/
 *.md
+
+# Las meta theme-color llevan la excepcion del lint de tokens en la misma linea.
+src/app.html

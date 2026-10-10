@@ -10,6 +10,8 @@ const config = {
 	kit: {
 		// Sitio 100 % estatico: nginx en pibot sirve `build/` y cae a index.html (SPA).
 		adapter: adapter({ fallback: 'index.html', strict: true }),
+		// Rutas absolutas: el shell guardado por el service worker se sirve tambien en /p/<id>.
+		paths: { relative: false },
 		version: { name: process.env.npm_package_version }
 	}
 };
