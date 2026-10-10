@@ -38,7 +38,7 @@ procesamiento ocurre en el navegador; no hay backend.
 ## Despliegue
 
 Sitio estático en pibot según `~/git/homelab-config/docs/DISENO-APPS.md` §4.2. Los manifiestos viven en ese repo
-(`cluster/apps/cyano/`), no aquí.
+(`cluster/apps/cyano/`), no aquí. Plan y datos verificados de la fase 5: `docs/FASE-5-DESPLIEGUE.md`.
 
 ## Referencia
 
