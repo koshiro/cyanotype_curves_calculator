@@ -123,6 +123,19 @@ Cada fase es una rama `feat/` desde `main` con su PR; `npm run verify` antes de 
 - Curva inicial desde `f` y `D` alimentando la calibración existente (`src/lib/core/curve/calibrate.ts`).
 - Soporte opcional de cuña Stouffer como validación.
 
+## Pendientes después de E5 (no empezar antes)
+
+1. **Registro de condiciones por copia.** Guardar con cada calibración y cada copia: papel, lote de química,
+   humedad, fuente UV, tiempo, revelado y virado. Una curva vale solo para sus condiciones; la app debe avisar al
+   usar una curva con condiciones distintas. Es la base de los pendientes 2 y 4.
+2. **Control de deriva sin recalibrar.** Tira corta de 6 a 8 parches para imprimir en el borde de cada copia. Al
+   medirla, estimar un ajuste simple (desplazamiento en log H con `f` conocida) y corregir la curva sin repetir el
+   objetivo completo; si el ajuste no basta, recomendar recalibrar.
+3. **Vista previa en azul de Prusia.** Mostrar la foto con la curva aplicada y el rango real del papel (con `f` y
+   `D(n)`): zonas empastadas, posterización y blancos inalcanzables, antes de imprimir.
+4. **Perfiles por virado.** Marcar una calibración como "virada con X" (té, tanino, carbonato…) y medir después
+   del virado; la vista previa usa el color del virado.
+
 ## Avisos para el usuario (texto de interfaz)
 
 - Usar una fuente UV estable (lámpara o medidor UV); con sol variable el tiempo no equivale a dosis.
