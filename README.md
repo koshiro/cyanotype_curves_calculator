@@ -3,7 +3,10 @@
 Calibrador de curvas para negativos digitales de cianotipo. Funciona **100 % en el navegador**: los escaneos y
 las curvas nunca salen del equipo de quien lo usa.
 
-> Estado: v0.2, flujo completo en el navegador; falta validarlo con escaneos reales. La implementación Python original queda como referencia en el tag
+En línea en **<https://cyano.danielriquelme.cl>**.
+
+> Estado: v0.2, flujo completo y publicado; falta validarlo con escaneos reales. La implementación Python original
+> queda como referencia en el tag
 > [`v0.1-python`](https://github.com/koshiro/cyanotype_curves_calculator/tree/v0.1-python).
 
 ## Qué hace
@@ -69,16 +72,30 @@ src/lib/core/      núcleo puro en TypeScript (sin DOM): matemática, curvas, ex
 src/lib/io/        lectura de PNG/TIFF de 8 y 16 bits y escritura del PNG del negativo
 src/lib/scan/      análisis de escaneos (Web Worker)
 src/lib/curve/     cálculo de curvas para la interfaz (Web Worker)
+src/lib/photo/     negativo de una foto en 16 bits (Web Worker)
+src/lib/project/   proyectos en IndexedDB, importación y exportación JSON
+src/lib/design/    color OKLCH y test de contraste WCAG de los tokens
 src/lib/steps/     pantallas de cada paso
 src/lib/ui/        componentes, tema, gráfico
 src/lib/i18n/      textos es/en
 src/routes/        rutas (SPA estática)
+scripts/           publicar.sh (despliegue)
+docs/              notas de despliegue
 ```
 
 ## Despliegue
 
-Sitio estático servido por nginx en el cluster del homelab (patrón «sitio estático en pibot»). CI publica el
-contenido de `build/` como artefacto; se sube con `rsync` al directorio que sirve nginx.
+Sitio estático servido por nginx en pibot (cluster del homelab), expuesto por un túnel de Cloudflare. Los manifiestos
+viven en el repo del homelab (`cluster/apps/cyano/`); la configuración de nginx (fallback SPA, caché del service
+worker, CSP) está documentada en [`docs/FASE-5-DESPLIEGUE.md`](docs/FASE-5-DESPLIEGUE.md).
+
+Para publicar una versión nueva desde `main` limpio:
+
+```bash
+scripts/publicar.sh   # npm ci + build + rsync a pibot; nginx la sirve sin reiniciar
+```
+
+El destino se cambia con `CYANO_DESTINO`. CI también deja `build/` como artefacto descargable (14 días).
 
 ## Licencia
 
